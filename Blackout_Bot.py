@@ -102,6 +102,9 @@ async def finalize_quest(user: discord.User | discord.Member):
     quest = quest_data.get(user_id)
     if not quest:
         return
+    if user_id not in user_data:
+        return  # Previi key error
+
     reward = quest.get("reward", 0)
     user_data[user_id]["xp"] += reward
 
@@ -111,30 +114,10 @@ async def finalize_quest(user: discord.User | discord.Member):
             f"🎉 {user.mention} ai finalizat misiunea și ai primit {reward} XP!"
         )
 
-    @bot.event
-    async def on_reaction_add(reaction, user):
-        if user.bot:
-            return
-
-        user_id = str(user.id)
-        quest = quest_data.get(user_id, {})
-
-        if quest.get("type") == "reactions":
-            # Evităm reacțiile date la propriile mesaje
-            if reaction.message.author.id == user.id:
-                return
-
-            progress = quest.get("progress", 0) + 1
-            quest["progress"] = progress
-
-            if progress >= quest.get("target", 0):
-                await finalize_quest(user)
-            else:
-                save_quest_data()
-
     quest_data[user_id] = {}
     save_quest_data()
     save_user_data()
+
 
 
 if os.path.exists(quest_data_file):
@@ -444,10 +427,13 @@ async def on_message(message):
         else:
             quest_data[user_id]["progress"] = quest["progress"]
 
-    if quest.get("type") == "mention_friend":
+    if quest.get("type") == "mention_friend" and quest.get("progress", 0) < quest.get("target", 0):
         if message.mentions and message.author.id != message.mentions[0].id:
             quest["progress"] = 1
-            finalize_quest(message.author)
+            if quest["progress"] >= quest["target"]:
+                await finalize_quest(message.author)
+            else:
+                save_quest_data()
 
     if quest.get("type") == "reply" and message.reference:
         ref_msg = await message.channel.fetch_message(
@@ -455,6 +441,33 @@ async def on_message(message):
         if ref_msg.author.id != message.author.id:
             quest["progress"] = 1
             await finalize_quest(message.author)
+
+    @bot.event
+    async def on_reaction_add(reaction, user):
+        if user.bot:
+            return
+
+        user_id = str(user.id)
+        quest = quest_data.get(user_id, {})
+
+        if quest.get("type") == "reactions":
+            # Evităm reacțiile date la propriile mesaje
+            if reaction.message.author.id == user.id:
+                return
+
+            progress = quest.get("progress", 0) + 1
+            quest["progress"] = progress
+
+            if progress >= quest.get("target", 0):
+                await finalize_quest(user)
+            else:
+                save_quest_data()
+
+    quest_data[user_id] = {}
+    save_quest_data()
+    save_user_data()
+
+
 
 
 
@@ -554,6 +567,7 @@ async def blackout_rank(interaction: discord.Interaction,
     await interaction.response.send_message(
         f"{member.mention} este nivel {level} cu {xp} XP.\n"
         f"✨ Mai ai nevoie de {xp_ramas} XP până la nivelul {level + 1}.")
+
 
 
 @bot.tree.error
