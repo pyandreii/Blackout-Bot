@@ -65,12 +65,6 @@ DAILY_QUESTS = [{
     "target": 1,
     "reward": 90
 }, {
-    "quest": "Oferă o idee nouă pentru server în <#1389621946345586689>",
-    "type": "suggestion",
-    "target": 1,
-    "reward": 200,
-    "rare": True
-}, {
     "quest": "Reacționează la 5 mesaje ale altor membri",
     "type": "reactions",
     "target": 5,
@@ -465,12 +459,6 @@ async def on_message(message):
         if message.mentions and message.author.id != message.mentions[0].id:
             quest["progress"] = 1
             finalize_quest(message.author)
-
-    if quest.get(
-            "type"
-    ) == "suggestion" and message.channel.id == 1389621946345586689:
-        quest["progress"] = 1
-        await finalize_quest(message.author)
 
     if quest.get("type") == "reply" and message.reference:
         ref_msg = await message.channel.fetch_message(
