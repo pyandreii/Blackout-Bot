@@ -32,12 +32,6 @@ rebirth_roles = {
     # ... poți continua cât ai nevoie
 }
 
-positive_keywords = [
-    "o sa fie bine", "poti", "reusesti", "incredere", "puternic", "respect",
-    "frumos", "motivat", "bravo", "felicitari", "superb", "mandru", "minunat",
-    "extraordinar"
-]
-
 # --- DAILY QUESTS ---
 DAILY_QUESTS = [{
     "quest": "Trimite 20 de mesaje pe server",
@@ -74,11 +68,6 @@ DAILY_QUESTS = [{
     "type": "reply",
     "target": 1,
     "reward": 100
-}, {
-    "quest": "Scrie un mesaj pozitiv sau motivațional azi",
-    "type": "positive_message",
-    "target": 1,
-    "reward": 110
 }]
 
 data_file = "data_nou.json"
@@ -467,11 +456,7 @@ async def on_message(message):
             quest["progress"] = 1
             await finalize_quest(message.author)
 
-    if quest.get("type") == "positive_message":
-        lower_msg = message.content.lower()
-        if any(word in lower_msg for word in positive_keywords):
-            quest["progress"] = 1
-            await finalize_quest(message.author)
+
 
     blackout_group = app_commands.Group(
         name="blackout", description="Comenzi pentru serverul BlackOut")
