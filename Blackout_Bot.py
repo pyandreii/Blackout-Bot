@@ -778,27 +778,23 @@ async def rules(interaction: discord.Interaction):
         text="📢 Pentru orice nelămurire, contactează staff-ul serverului.")
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-bot = discord.Client(intents=discord.Intents.default())
-tree = app_commands.CommandTree(bot)
+YOUR_OWNER_ID = 711202139434647642
 
-# Your existing blackout group
-blackout_group = app_commands.Group(
-    name="blackout",
-    description="Comenzi pentru serverul BlackOut"
+import json
+from discord import app_commands, Interaction
+
+OWNER_ID = 711202139434647642  # Replace with your Discord user ID
+
+
+@blackout.command(
+    name="showdata",
+    description="Arată datele JSON ale botului (doar owner)"
 )
-
-OWNER_ID = 711202139434647642
-
-@blackout_group.command(name="sent_anunt", description="Trimite anunț")
-async def sent_anunt(interaction: discord.Interaction):
-    await interaction.response.send_message("Anunț trimis!")
-
-
-# New showdata command
-@blackout_group.command(name="showdata", description="Arată datele JSON (doar owner)")
-async def showdata(interaction: discord.Interaction):
+async def showdata(interaction: Interaction):
     if interaction.user.id != OWNER_ID:
-        await interaction.response.send_message("Nu ai permisiunea să folosești această comandă.", ephemeral=True)
+        await interaction.response.send_message(
+            "Nu ai permisiunea să folosești această comandă.", ephemeral=True
+        )
         return
 
     # Load JSON data
@@ -807,18 +803,23 @@ async def showdata(interaction: discord.Interaction):
 
     data_str = json.dumps(data, indent=4)
 
+    # If data is too large to send in one message
     if len(data_str) > 1900:
-        await interaction.response.send_message("Datele sunt prea mari, le trimit prin DM.", ephemeral=True)
+        await interaction.response.send_message(
+            "Datele sunt prea mari, le trimit prin DM.", ephemeral=True
+        )
         try:
-            await interaction.user.send(file=discord.File('data.json'))
-        except discord.Forbidden:
-            await interaction.followup.send("Nu pot să trimit mesaj privat.", ephemeral=True)
+            await interaction.user.send(file=discord.File('data_nou.json'))
+        except Exception:
+            await interaction.followup.send(
+                "Nu pot să trimit mesaj privat.", ephemeral=True
+            )
     else:
         await interaction.response.send_message(f"```json\n{data_str}\n```", ephemeral=True)
 
 
-# Add the group to the tree
-tree.add_command(blackout_group)
+# Then register this group in your bot setup code:
+
 
 
 @blackout.command(name="profile", description="Vezi profilul tău Blackout")
