@@ -798,7 +798,7 @@ async def showdata(interaction: Interaction):
         return
 
     # Load JSON data
-    with open('data.json', 'r') as f:
+    with open('data_nou.json', 'r') as f:
         data = json.load(f)
 
     data_str = json.dumps(data, indent=4)
