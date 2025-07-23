@@ -284,30 +284,32 @@ async def give_voice_xp():
                     continue
 
                 user_id = str(member.id)
+
                 if user_id not in user_data:
-                    user_data.setdefault(user_id, {
-                        "xp": 0,
-                        "level": 0,
-                        "rebirth": 0
-                    })
+                    user_data[user_id] = {"xp": 0, "level": 0, "rebirth": 0}
 
+                # 🎯 Quest de tip voice_minutes
                 quest = quest_data.get(user_id)
-                if isinstance(quest, dict) and quest.get("type") == "voice_minutes" and quest.get("progress",
-                                                                                                  0) < quest.get(
-                        "target", 0):
-                    quest["progress"] = quest.get("progress", 0) + 1
-                    quest_data[user_id]["progress"] = quest["progress"]  # actualizare în quest_data
-                    save_quest_data()
-
-                    if quest["progress"] >= quest["target"]:
-                        user_data[user_id]["xp"] += quest.get("reward", 0)
-                        channel = guild.get_channel(text_channel_id)
-                        if channel:
-                            await channel.send(
-                                f"🎉 {member.mention} ai finalizat misiunea zilnică și ai primit {quest['reward']} XP!")
-                        quest_data[user_id] = {}  # resetează questul
+                if isinstance(quest, dict) and quest.get("type") == "voice_minutes":
+                    if quest.get("progress", 0) < quest.get("target", 0):
+                        quest["progress"] += 1
+                        quest_data[user_id]["progress"] = quest["progress"]
                         save_quest_data()
-                        save_user_data()
+
+                        print(f"[VOICE QUEST] {member.display_name}: {quest['progress']}/{quest['target']}")
+
+                        if quest["progress"] >= quest["target"]:
+                            user_data[user_id]["xp"] += quest["reward"]
+                            save_user_data()
+
+                            channel = guild.get_channel(text_channel_id)
+                            if channel:
+                                await channel.send(
+                                    f"🎉 {member.mention} ai finalizat misiunea voice și ai primit {quest['reward']} XP!"
+                                )
+
+                            quest_data[user_id] = {}
+                            save_quest_data()
 
                 # XP pentru voice activ
                 user_data[user_id]["xp"] += 10
@@ -408,10 +410,45 @@ async def on_ready():
     if not give_voice_xp.is_running():
         give_voice_xp.start()
 
+@give_voice_xp.before_loop
+async def before_voice_xp():
+    await bot.wait_until_ready()
 
+@give_voice_xp.error
+async def voice_xp_error(error):
+    print(f"[Loop Error] {error}")
 # --- Anti-spam & leveling mesaj text ---
 
+@bot.event
+async def on_raw_reaction_add(payload):
+    if payload.user_id == bot.user.id:
+        return  # ignoră reacțiile botului
 
+    user_id = str(payload.user_id)
+
+    quest = quest_data.get(user_id)
+    if isinstance(quest, dict) and quest.get("type") == "reaction":
+        if quest.get("progress", 0) < quest.get("target", 0):
+            quest["progress"] += 1
+            quest_data[user_id]["progress"] = quest["progress"]
+            save_quest_data()
+
+            if quest["progress"] >= quest["target"]:
+                # Dă XP
+                user_data.setdefault(user_id, {"xp": 0, "level": 0, "rebirth": 0})
+                user_data[user_id]["xp"] += quest["reward"]
+                save_user_data()
+
+                guild = bot.get_guild(payload.guild_id)
+                member = guild.get_member(payload.user_id)
+                channel = guild.get_channel(text_channel_id)
+                if member and channel:
+                    await channel.send(
+                        f"🎉 {member.mention} ai finalizat misiunea cu reacții și ai primit {quest['reward']} XP!"
+                    )
+
+                quest_data[user_id] = {}  # Reset
+                save_quest_data()
 
 @bot.event
 async def on_message(message):
@@ -460,7 +497,7 @@ async def on_message(message):
         return  # Nu mai procesăm restul dacă e spam
 
     # Quest progres
-    quest = quest_data.get(user_id, {})
+        quest = quest_data.get(user_id, {})
 
     # 1. messages_sent
     if quest.get("type") == "messages" and quest.get("progress", 0) < quest.get("target", 0):
@@ -591,19 +628,32 @@ async def on_reaction_add(reaction, user):
         return
 
     user_id = str(user.id)
-    quest = quest_data.get(user_id, {})
+    quest = quest_data.get(user_id)
 
-    if quest.get("type") == "reactions" and quest.get("progress", 0) < quest.get("target", 0):
-        if reaction.message.author.id == user.id:
-            return  # evită reacțiile la propriile mesaje
-
-        quest["progress"] += 1
-
-        if quest["progress"] >= quest.get("target", 0):
-            await finalize_quest(user)
-        else:
+    # Verifică dacă e quest de tip "reaction"
+    if isinstance(quest, dict) and quest.get("type") == "reaction":
+        if quest.get("progress", 0) < quest.get("target", 0):
+            quest["progress"] += 1
             quest_data[user_id]["progress"] = quest["progress"]
             save_quest_data()
+
+            print(f"[REACTION QUEST] {user.display_name}: {quest['progress']}/{quest['target']}")
+
+            if quest["progress"] >= quest["target"]:
+                user_data[user_id]["xp"] += quest["reward"]
+                save_user_data()
+
+                # Ia canalul corect
+                guild = reaction.message.guild
+                channel = guild.get_channel(text_channel_id)
+
+                if channel:
+                    await channel.send(
+                        f"🎉 {user.mention} ai finalizat misiunea cu reacții și ai primit {quest['reward']} XP!"
+                    )
+
+                quest_data[user_id] = {}
+                save_quest_data()
 
 
 @blackout.command(name="rank", description="Vezi nivelul și XP-ul unui membru")
@@ -909,7 +959,7 @@ async def leaderboard_lunar(interaction: discord.Interaction):
     embed.timestamp = datetime.now(timezone.utc)
 
     await interaction.response.send_message(embed=embed)
-    
+
 @blackout.command(
     name="showdata",
     description="Arată datele JSON ale botului (doar owner)"
