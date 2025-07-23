@@ -860,11 +860,11 @@ from discord import app_commands, Interaction
 OWNER_ID = 711202139434647642  # Replace with your Discord user ID
 
 
-@blackout.command(name="leaderboard_lunar", description="Top XP pe această lună")
+@blackout.command(name="leaderboard_lunar",
+                  description="Vezi top 10 utilizatori după XP lunar")
 async def leaderboard_lunar(interaction: discord.Interaction):
-    # Încarcă datele lunare
     try:
-        with open("monthly_data.json", "r") as f:
+        with open("monthly_data.json", "r", encoding="utf-8") as f:
             monthly_data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         monthly_data = {}
@@ -873,44 +873,43 @@ async def leaderboard_lunar(interaction: discord.Interaction):
         await interaction.response.send_message("📭 Nu există date pentru luna aceasta.")
         return
 
-    # Sortează utilizatorii după XP lunar
-    top_users = sorted(monthly_data.items(), key=lambda x: x[1].get("xp", 0), reverse=True)[:10]
+    sorted_users = sorted(monthly_data.items(),
+                          key=lambda x: x[1].get("xp", 0),
+                          reverse=True)
 
-    # Numele lunii curente
-    current_month = calendar.month_name[datetime.utcnow().month]
+    embed = discord.Embed(title="📅 Leaderboard Lunar",
+                          description="Top 10 utilizatori cu cel mai mult XP în această lună",
+                          color=discord.Color.teal())
 
-    embed = discord.Embed(
-        title=f"📆 Clasamentul Lunii {current_month}",
-        description="Top 10 cei mai activi membri",
-        color=discord.Color.blue()
-    )
-
-    for i, (user_id, data) in enumerate(top_users, start=1):
+    first_user = None
+    for i, (user_id, data) in enumerate(sorted_users[:10], start=1):
         try:
-            member = await interaction.guild.fetch_member(int(user_id))
-            name = member.display_name
-        except:
-            name = f"User ID {user_id}"
+            member = interaction.guild.get_member(int(user_id))
+            if member is None:
+                member = await interaction.guild.fetch_member(int(user_id))
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            member = None
 
+        name = member.display_name if member else f"User ID {user_id}"
         xp = data.get("xp", 0)
-        if i == 1:
-            embed.add_field(
-                name=f"🥇 Locul 1 în {current_month}: {name}",
-                value=f"✨ XP: `{xp}`",
-                inline=False
-            )
-        else:
-            embed.add_field(
-                name=f"{i}. {name}",
-                value=f"XP: `{xp}`",
-                inline=False
-            )
 
-    embed.set_footer(text="🔁 Se resetează la începutul fiecărei luni")
+        if i == 1 and member and member.avatar:
+            first_user = member
+
+        embed.add_field(
+            name=f"{i}. {name}",
+            value=f"✨ XP lunar: `{xp}`",
+            inline=False
+        )
+
+    if first_user and first_user.avatar:
+        embed.set_thumbnail(url=first_user.avatar.url)
+
+    embed.set_footer(text="📆 Clasament lunar actualizat")
     embed.timestamp = datetime.now(timezone.utc)
 
     await interaction.response.send_message(embed=embed)
-
+    
 @blackout.command(
     name="showdata",
     description="Arată datele JSON ale botului (doar owner)"
@@ -976,7 +975,7 @@ async def showmonthly(interaction: Interaction):
             )
     else:
         await interaction.response.send_message(f"```json\n{data_str}\n```", ephemeral=True)
-        
+
 # Then register this group in your bot setup code:
 @blackout.command(
     name="quest_data",
