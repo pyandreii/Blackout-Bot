@@ -942,7 +942,41 @@ async def showdata(interaction: Interaction):
     else:
         await interaction.response.send_message(f"```json\n{data_str}\n```", ephemeral=True)
 
+@blackout.command(
+    name="showmonthly",
+    description="Arată leaderboard-ul lunar (doar owner)"
+)
+async def showmonthly(interaction: Interaction):
+    if interaction.user.id != OWNER_ID:
+        await interaction.response.send_message(
+            "Nu ai permisiunea să folosești această comandă.", ephemeral=True
+        )
+        return
 
+    try:
+        with open('monthly_data.json', 'r', encoding='utf-8') as f:
+            monthly_data = json.load(f)
+    except Exception as e:
+        await interaction.response.send_message(
+            f"Eroare la încărcarea leaderboard-ului lunar: {e}", ephemeral=True
+        )
+        return
+
+    data_str = json.dumps(monthly_data, indent=4, ensure_ascii=False)
+
+    if len(data_str) > 1900:
+        await interaction.response.send_message(
+            "Leaderboard-ul este prea mare, îl trimit prin mesaj privat.", ephemeral=True
+        )
+        try:
+            await interaction.user.send(file=discord.File('monthly_data.json'))
+        except Exception:
+            await interaction.followup.send(
+                "Nu pot să trimit mesaj privat. Verifică setările tale de DM.", ephemeral=True
+            )
+    else:
+        await interaction.response.send_message(f"```json\n{data_str}\n```", ephemeral=True)
+        
 # Then register this group in your bot setup code:
 @blackout.command(
     name="quest_data",
