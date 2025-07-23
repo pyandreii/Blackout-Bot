@@ -75,7 +75,7 @@ quest_data_file = "data_quest.json"
 
 
 def save_quest_data():
-    with open(quest_data_file, "w") as f:
+    with open(quest_data.json, "w") as f:
         json.dump(quest_data, f, indent=4)
 
 
@@ -840,7 +840,35 @@ async def showdata(interaction: Interaction):
 
 
 # Then register this group in your bot setup code:
+@blackout.command(
+    name="quest_data",
+    description="Arată datele JSON ale misiunilor (doar owner)"
+)
+async def quest_data(interaction: Interaction):
+    if interaction.user.id != OWNER_ID:
+        await interaction.response.send_message(
+            "Nu ai permisiunea să folosești această comandă.", ephemeral=True
+        )
+        return
 
+    # Load JSON quest data
+    with open('data_quest.json', 'r') as f:
+        data = json.load(f)
+
+    data_str = json.dumps(data, indent=4)
+
+    if len(data_str) > 1900:
+        await interaction.response.send_message(
+            "Datele sunt prea mari, le trimit prin DM.", ephemeral=True
+        )
+        try:
+            await interaction.user.send(file=discord.File('data_quest.json'))
+        except Exception:
+            await interaction.followup.send(
+                "Nu pot să trimit mesaj privat.", ephemeral=True
+            )
+    else:
+        await interaction.response.send_message(f"```json\n{data_str}\n```", ephemeral=True)
 
 
 @blackout.command(name="profile", description="Vezi profilul tău Blackout")
