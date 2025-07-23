@@ -105,7 +105,7 @@ async def finalize_quest(user: discord.User | discord.Member):
     if user_id not in user_data:
         return  # Previi key error
 
-    reward = quest.get("reward", 0)
+    reward = int(quest.get("reward", 0))
     user_data[user_id]["xp"] += reward
 
     channel = bot.get_channel(text_channel_id)
@@ -117,6 +117,7 @@ async def finalize_quest(user: discord.User | discord.Member):
     quest_data[user_id] = {}
     save_quest_data()
     save_user_data()
+
 
 
 
@@ -368,6 +369,7 @@ async def on_ready():
 # --- Anti-spam & leveling mesaj text ---
 
 
+
 @bot.event
 async def on_message(message):
     if message.author.bot:
@@ -414,57 +416,42 @@ async def on_message(message):
 
     # Quest progres
     quest = quest_data.get(user_id, {})
-    if quest.get("type") == "messages" and quest.get(
-            "progress", 0) < quest.get("target", 0):
+
+    # 1. messages_sent
+    if quest.get("type") == "messages_sent" and quest.get("progress", 0) < quest.get("target", 0):
         quest["progress"] += 1
         if quest["progress"] >= quest["target"]:
-            reward = quest.get("reward", 0)
-            user_data[user_id]["xp"] += reward
-            await message.channel.send(
-                f"🎉 {message.author.mention} ai finalizat misiunea și ai primit {reward} XP!"
-            )
-            quest_data[user_id] = {}
+            await finalize_quest(message.author)
         else:
             quest_data[user_id]["progress"] = quest["progress"]
+            save_quest_data()
 
+    # 2. mention_friend
     if quest.get("type") == "mention_friend" and quest.get("progress", 0) < quest.get("target", 0):
-        if message.mentions and message.author.id != message.mentions[0].id:
-            quest["progress"] = 1
+        if message.mentions and message.author.id not in [m.id for m in message.mentions]:
+            quest["progress"] += 1
             if quest["progress"] >= quest["target"]:
                 await finalize_quest(message.author)
             else:
+                quest_data[user_id]["progress"] = quest["progress"]
                 save_quest_data()
 
-    if quest.get("type") == "reply" and message.reference:
-        ref_msg = await message.channel.fetch_message(
-            message.reference.message_id)
-        if ref_msg.author.id != message.author.id:
-            quest["progress"] = 1
-            await finalize_quest(message.author)
+    # 3. reply
+    if quest.get("type") == "reply" and quest.get("progress", 0) < quest.get("target", 0):
+        if message.reference and message.reference.message_id:
+            try:
+                ref_msg = await message.channel.fetch_message(message.reference.message_id)
+            except discord.NotFound:
+                return  # Mesajul la care se răspunde a fost șters, deci ieșim din funcție
+            if ref_msg.author.id != message.author.id:
+                quest["progress"] += 1
+                if quest["progress"] >= quest["target"]:
+                    await finalize_quest(message.author)
+                else:
+                    quest_data[user_id]["progress"] = quest["progress"]
+                    save_quest_data()
 
-    @bot.event
-    async def on_reaction_add(reaction, user):
-        if user.bot:
-            return
 
-        user_id = str(user.id)
-        quest = quest_data.get(user_id, {})
-
-        if quest.get("type") == "reactions":
-            # Evităm reacțiile date la propriile mesaje
-            if reaction.message.author.id == user.id:
-                return
-
-            progress = quest.get("progress", 0) + 1
-            quest["progress"] = progress
-
-            if progress >= quest.get("target", 0):
-                await finalize_quest(user)
-            else:
-                save_quest_data()
-
-    quest_data[user_id] = {}
-    save_quest_data()
     save_user_data()
 
 
@@ -545,6 +532,26 @@ async def on_message(message):
 
     # Permite procesarea altor comenzi
     await bot.process_commands(message)
+
+@bot.event
+async def on_reaction_add(reaction, user):
+    if user.bot:
+        return
+
+    user_id = str(user.id)
+    quest = quest_data.get(user_id, {})
+
+    if quest.get("type") == "reactions" and quest.get("progress", 0) < quest.get("target", 0):
+        if reaction.message.author.id == user.id:
+            return  # evită reacțiile la propriile mesaje
+
+        quest["progress"] += 1
+
+        if quest["progress"] >= quest.get("target", 0):
+            await finalize_quest(user)
+        else:
+            quest_data[user_id]["progress"] = quest["progress"]
+            save_quest_data()
 
 
 @blackout.command(name="rank", description="Vezi nivelul și XP-ul unui membru")
