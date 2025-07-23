@@ -73,9 +73,18 @@ DAILY_QUESTS = [{
 data_file = "data_nou.json"
 quest_data_file = "data_quest.json"
 
+if os.path.exists(quest_data_file):
+    with open(quest_data_file, "r") as f:
+        try:
+            quest_data = json.load(f)
+        except json.JSONDecodeError:
+            quest_data = {}
+else:
+    quest_data = {}
+
 
 def save_quest_data():
-    with open(quest_data.json, "w") as f:
+    with open(quest_data_file, "w") as f:
         json.dump(quest_data, f, indent=4)
 
 
@@ -117,18 +126,6 @@ async def finalize_quest(user: discord.User | discord.Member):
     quest_data[user_id] = {}
     save_quest_data()
     save_user_data()
-
-
-
-
-if os.path.exists(quest_data_file):
-    with open(quest_data_file, "r") as f:
-        try:
-            quest_data = json.load(f)
-        except json.JSONDecodeError:
-            quest_data = {}
-else:
-    quest_data = {}
 
 spam_limit_count = 3
 spam_limit_seconds = 5
