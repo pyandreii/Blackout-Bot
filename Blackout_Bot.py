@@ -12,8 +12,8 @@ import os
 
 ID_SERVER_PRINCIPAL = 1372682829074530335
 text_channel_id = 1389616154259226625
-CO_OWNER_ROLE_ID = 1390452455187415190
-REQUIRED_ROLE_ID = 1390452455187415190
+CO_OWNER_ROLE_ID = 1397521192092700702
+REQUIRED_ROLE_ID = 1397521192092700702
 
 role_nivele = {
     1: 1390238119734935673,
@@ -652,7 +652,7 @@ async def blackout_leaderboard(interaction: discord.Interaction):
 ])
 async def sent(interaction: discord.Interaction, channel: discord.TextChannel,
                mesaj: str, format: app_commands.Choice[str]):
-    CO_OWNER_ROLE_ID = 1390452455187415190  # Pune aici ID-ul corect al rolului tău
+    CO_OWNER_ROLE_ID = 1397521192092700702  # Pune aici ID-ul corect al rolului tău
 
     # Obține membrul din guild (pentru a avea acces la roluri)
     member = interaction.guild.get_member(interaction.user.id)
