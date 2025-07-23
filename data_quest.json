@@ -11,7 +11,14 @@
         "type": "messages",
         "target": 20,
         "reward": 100,
-        "progress": 0
+        "progress": 12
     },
-    "1094241583932657666": {}
+    "1094241583932657666": {},
+    "1171568170604179507": {
+        "quest": "Stai 15 minute \u00een voice chat",
+        "type": "voice_minutes",
+        "target": 15,
+        "reward": 120,
+        "progress": 0
+    }
 }
