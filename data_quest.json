@@ -1,1 +1,16 @@
-{}
+{
+    "1210476003709681695": {
+        "quest": "Stai 15 minute \u00een voice chat",
+        "type": "voice_minutes",
+        "target": 15,
+        "reward": 120,
+        "progress": 0
+    },
+    "1074388016182870117": {
+        "quest": "Trimite 20 de mesaje pe server",
+        "type": "messages",
+        "target": 20,
+        "reward": 100,
+        "progress": 0
+    }
+}
