@@ -849,7 +849,7 @@ async def showdata(interaction: Interaction):
     name="quest_data",
     description="Arată datele JSON ale misiunilor (doar owner)"
 )
-async def quest_data(interaction: Interaction):
+async def show_quest_data(interaction: Interaction):
     if interaction.user.id != OWNER_ID:
         await interaction.response.send_message(
             "Nu ai permisiunea să folosești această comandă.", ephemeral=True
@@ -874,7 +874,6 @@ async def quest_data(interaction: Interaction):
             )
     else:
         await interaction.response.send_message(f"```json\n{data_str}\n```", ephemeral=True)
-
 
 @blackout.command(name="profile", description="Vezi profilul tău Blackout")
 @app_commands.describe(user="Utilizatorul căruia vrei să-i vezi profilul")
