@@ -205,13 +205,6 @@ def save_data(data):
 def xp_needed(level):
     return 5 * (level**2) + 50 * level + 100
 
-def generate_daily_quest():
-    return {
-        "quest": "Trimite 10 mesaje într-un canal text",
-        "type": "message",
-        "target": 10,
-        "reward": 80
-    }
 
 # --- Bot și grup slash commands ---
 blackout = app_commands.Group(name="blackout",
