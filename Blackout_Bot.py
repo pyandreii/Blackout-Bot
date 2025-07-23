@@ -8,6 +8,7 @@ import discord
 import asyncio
 from dotenv import load_dotenv
 import os
+import calendar
 # --- Configurare ---
 
 ID_SERVER_PRINCIPAL = 1372682829074530335
@@ -22,7 +23,11 @@ role_nivele = {
     15: 1390237906458775633,
     20: 1391528616172720128,
 }
+monthly_roles = {
+    "2025-07": 1397576340689129482,  # ID rol pentru iulie 2025
+    "2025-08": 1397576432166895708,  # ID rol pentru august 2025
 
+}
 rebirth_roles = {
     1: 1395364152419029005,
     2: 1395364253627846806,
@@ -82,6 +87,20 @@ if os.path.exists(quest_data_file):
 else:
     quest_data = {}
 
+monthly_data_file = "monthly_data.json"
+
+if os.path.exists(monthly_data_file):
+    with open(monthly_data_file, "r") as f:
+        try:
+            monthly_data = json.load(f)
+        except json.JSONDecodeError:
+            monthly_data = {}
+else:
+    monthly_data = {}
+
+def save_monthly_data():
+    with open(monthly_data_file, "w") as f:
+        json.dump(monthly_data, f, indent=4)
 
 def save_quest_data():
     with open(quest_data_file, "w") as f:
@@ -273,24 +292,22 @@ async def give_voice_xp():
                     })
 
                 quest = quest_data.get(user_id)
-                if isinstance(quest, dict) and quest.get(
-                        "type") == "voice_minutes" and quest.get(
-                            "progress", 0) < quest.get("target", 0):
+                if isinstance(quest, dict) and quest.get("type") == "voice_minutes" and quest.get("progress",
+                                                                                                  0) < quest.get(
+                        "target", 0):
                     quest["progress"] = quest.get("progress", 0) + 1
+                    quest_data[user_id]["progress"] = quest["progress"]  # actualizare în quest_data
+                    save_quest_data()
+
                     if quest["progress"] >= quest["target"]:
-                        user_data[user_id]["xp"] += quest["reward"]
+                        user_data[user_id]["xp"] += quest.get("reward", 0)
                         channel = guild.get_channel(text_channel_id)
                         if channel:
                             await channel.send(
-                                f"🎉 {member.mention} ai finalizat misiunea zilnică și ai primit {quest['reward']} XP!"
-                            )
-                        quest_data[user_id] = {}  # Resetare quest
+                                f"🎉 {member.mention} ai finalizat misiunea zilnică și ai primit {quest['reward']} XP!")
+                        quest_data[user_id] = {}  # resetează questul
                         save_quest_data()
                         save_user_data()
-                    else:
-                        # Actualizare progres
-                        quest_data[user_id]["progress"] = quest["progress"]
-                        save_quest_data()
 
                 # XP pentru voice activ
                 user_data[user_id]["xp"] += 10
@@ -336,6 +353,34 @@ async def give_voice_xp():
 
 # --- Eveniment on_ready ---
 
+@tasks.loop(hours=24)
+async def check_month_reset():
+    today = datetime.utcnow().date()
+    if today.day == 1:
+        # Încarcă lunar_data curentă
+        with open("monthly_data.json", "r") as f:
+            monthly_data = json.load(f)
+
+        # Sortează după XP ca să găsești locul 1
+        if monthly_data:
+            top_user_id = max(monthly_data, key=lambda uid: monthly_data[uid]["xp"])
+            guild = bot.get_guild(1372682829074530335)  # pune aici ID serverului tău
+            member = guild.get_member(int(top_user_id))
+            if member:
+                # Mapă rol lunar după lună, ex: "2025-07"
+                month_str = (today - timedelta(days=1)).strftime("%Y-%m")  # luna trecută
+                role_id = monthly_roles.get(month_str)
+                if role_id:
+                    role = guild.get_role(role_id)
+                    if role and role not in member.roles:
+                        await member.add_roles(role)
+                        print(f"🎉 {member.display_name} a primit rolul pentru {month_str}!")
+
+        # Resetează datele
+        with open("monthly_data.json", "w") as f:
+            json.dump({}, f, indent=4)
+
+        print("🔁 Lunar leaderboard resetat!")
 
 @bot.event
 async def on_ready():
@@ -464,7 +509,14 @@ async def on_message(message):
     bot.tree.add_command(blackout_group)
 
     # Adaugă XP normal
-    user_data[user_id]["xp"] += 10
+    user_data[user_id]["xp"] += 5
+
+    if user_id not in monthly_data:
+        monthly_data[user_id] = {"xp": 0}
+    monthly_data[user_id]["xp"] += 10
+    save_monthly_data()
+
+
 
     xp = user_data[user_id]["xp"]
     level = user_data[user_id]["level"]
@@ -807,6 +859,57 @@ from discord import app_commands, Interaction
 
 OWNER_ID = 711202139434647642  # Replace with your Discord user ID
 
+
+@blackout.command(name="leaderboard_lunar", description="Top XP pe această lună")
+async def leaderboard_lunar(interaction: discord.Interaction):
+    # Încarcă datele lunare
+    try:
+        with open("monthly_data.json", "r") as f:
+            monthly_data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        monthly_data = {}
+
+    if not monthly_data:
+        await interaction.response.send_message("📭 Nu există date pentru luna aceasta.")
+        return
+
+    # Sortează utilizatorii după XP lunar
+    top_users = sorted(monthly_data.items(), key=lambda x: x[1].get("xp", 0), reverse=True)[:10]
+
+    # Numele lunii curente
+    current_month = calendar.month_name[datetime.utcnow().month]
+
+    embed = discord.Embed(
+        title=f"📆 Clasamentul Lunii {current_month}",
+        description="Top 10 cei mai activi membri",
+        color=discord.Color.blue()
+    )
+
+    for i, (user_id, data) in enumerate(top_users, start=1):
+        try:
+            member = await interaction.guild.fetch_member(int(user_id))
+            name = member.display_name
+        except:
+            name = f"User ID {user_id}"
+
+        xp = data.get("xp", 0)
+        if i == 1:
+            embed.add_field(
+                name=f"🥇 Locul 1 în {current_month}: {name}",
+                value=f"✨ XP: `{xp}`",
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name=f"{i}. {name}",
+                value=f"XP: `{xp}`",
+                inline=False
+            )
+
+    embed.set_footer(text="🔁 Se resetează la începutul fiecărei luni")
+    embed.timestamp = datetime.now(timezone.utc)
+
+    await interaction.response.send_message(embed=embed)
 
 @blackout.command(
     name="showdata",
