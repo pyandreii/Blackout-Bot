@@ -372,6 +372,8 @@ async def on_ready():
 async def on_message(message):
     if message.author.bot:
         return
+    if not message.guild:
+        return
 
     user_id = str(message.author.id)
     now = datetime.now(timezone.utc)
@@ -416,7 +418,7 @@ async def on_message(message):
     quest = quest_data.get(user_id, {})
 
     # 1. messages_sent
-    if quest.get("type") == "message" and quest.get("progress", 0) < quest.get("target", 0):
+    if quest.get("type") == "messages" and quest.get("progress", 0) < quest.get("target", 0):
         quest["progress"] += 1
         if quest["progress"] >= quest["target"]:
             await finalize_quest(message.author)
