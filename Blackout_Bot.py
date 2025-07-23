@@ -340,7 +340,7 @@ async def give_voice_xp():
 @bot.event
 async def on_ready():
     print(f"✅ Bot conectat ca {bot.user}")
-    await bot.change_presence(activity=discord.Game(name="Va iubesc BlackOut RO, mereu voi fi aici"))
+    await bot.change_presence(activity=discord.CustomActivity(name="❤️ Vă iubesc, BlackOut RO! Mereu voi fi aici"))
     print(f"Guild-uri pe care sunt: {[guild.id for guild in bot.guilds]}")
 
     # Înregistrează grupul de comenzi blackout
