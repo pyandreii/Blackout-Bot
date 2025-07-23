@@ -208,6 +208,13 @@ def save_data(data):
 def xp_needed(level):
     return 5 * (level**2) + 50 * level + 100
 
+def generate_daily_quest():
+    return {
+        "quest": "Trimite 10 mesaje într-un canal text",
+        "type": "message",
+        "target": 10,
+        "reward": 80
+    }
 
 # --- Bot și grup slash commands ---
 blackout = app_commands.Group(name="blackout",
@@ -699,42 +706,43 @@ async def sent(interaction: discord.Interaction, channel: discord.TextChannel,
                                                 ephemeral=True)
 
 
-@blackout.command(name="daily",
-                  description="Primește o misiune zilnică aleatorie")
+@blackout.command(name="daily", description="Primește o misiune zilnică aleatorie")
 async def daily(interaction: discord.Interaction):
-    user_id = str(interaction.user.id)
-    today = datetime.utcnow().date()
+    try:
+        user_id = str(interaction.user.id)
+        today = datetime.utcnow().date()
 
-    if user_id not in user_data:
-        user_data.setdefault(user_id, {"xp": 0, "level": 0, "rebirth": 0})
+        if user_id not in user_data:
+            user_data.setdefault(user_id, {"xp": 0, "level": 0, "rebirth": 0})
 
-    last_claim = datetime.strptime(
-        user_data[user_id].get("last_daily", "2000-01-01"), "%Y-%m-%d").date()
+        last_claim_str = user_data[user_id].get("last_daily", "2000-01-01")
+        last_claim = datetime.strptime(last_claim_str, "%Y-%m-%d").date()
 
-    if today > last_claim:
-        quest = generate_daily_quest()
-        user_data[user_id]["last_daily"] = str(today)
+        if today > last_claim:
+            quest = generate_daily_quest()
+            user_data[user_id]["last_daily"] = str(today)
 
-        # Mută misiunea în quest_data
-        quest_data[user_id] = {
-            "quest": quest["quest"],
-            "type": quest["type"],
-            "target": quest["target"],
-            "reward": quest["reward"],
-            "progress": 0
-        }
-        save_quest_data()
-        save_user_data()
+            quest_data[user_id] = {
+                "quest": quest["quest"],
+                "type": quest["type"],
+                "target": quest["target"],
+                "reward": quest["reward"],
+                "progress": 0
+            }
+            save_quest_data()
+            save_user_data()
 
-        await interaction.response.send_message(
-            f"🗓️ Misiunea ta zilnică: **{quest['quest']}**\n"
-            f"Recompensă: {quest['reward']} XP\n"
-            "Succes!")
-    else:
-        await interaction.response.send_message(
-            "⏳ Ai deja o misiune zilnică activă sau ai revendicat deja azi. Revino mâine!"
-        )
-
+            await interaction.response.send_message(
+                f"🗓️ Misiunea ta zilnică: **{quest['quest']}**\n"
+                f"Recompensă: {quest['reward']} XP\n"
+                "Succes!"
+            )
+        else:
+            await interaction.response.send_message(
+                "⏳ Ai deja o misiune zilnică activă sau ai revendicat deja azi. Revino mâine!"
+            )
+    except Exception as e:
+        await interaction.response.send_message(f"❌ A apărut o eroare: `{e}`")
 
 @app_commands.command(
     name="sent_anunt",
