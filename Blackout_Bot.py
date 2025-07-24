@@ -610,30 +610,17 @@ async def on_reaction_add(reaction, user):
     user_id = str(user.id)
     quest = quest_data.get(user_id)
 
-    # ✅ Verificăm dacă e o misiune de tip 'reaction'
-    if isinstance(quest, dict) and quest.get("type") == "reaction":
+    if quest and isinstance(quest, dict) and quest.get("type") == "reaction":
         progress = quest.get("progress", 0) + 1
-        target = quest.get("target", 0)
         quest["progress"] = progress
         quest_data[user_id] = quest
         save_quest_data()
 
-        print(f"[REACTION QUEST] {user.display_name}: {progress}/{target}")  # DEBUG
-
-        if progress >= target:
-            user_data[user_id]["xp"] += quest.get("reward", 0)
-            save_user_data()
-
-            guild = reaction.message.guild  # <- aici luăm guildul corect
-            channel = guild.get_channel(text_channel_id)
-            if channel:
-                await channel.send(
-                    f"🎉 {user.mention} ai finalizat misiunea cu reacții și ai primit {quest['reward']} XP!"
-                )
-
-            # Resetare misiune
-            quest_data[user_id] = {}
-            save_quest_data()
+        if progress >= quest.get("target", 0):
+            await finalize_quest(user)
+        else:
+            # Poți trimite un mesaj privat sau log, dacă vrei
+            print(f"[REACTION QUEST] {user.display_name} progres: {progress}/{quest.get('target')}")
 
 
 @blackout.command(name="rank", description="Vezi nivelul și XP-ul unui membru")
