@@ -895,8 +895,7 @@ async def sent(interaction: discord.Interaction, channel: discord.TextChannel,
 
 @blackout.command(name="daily", description="Primește o misiune zilnică aleatorie")
 async def daily(interaction: discord.Interaction):
-    await interaction.followup.send(
-        "❌ A apărut o eroare la executarea comenzii.", ephemeral=True) # Confirmăm interacțiunea imediat, cu loading
+    await interaction.response.defer(ephemeral=True)  # ✅ Confirmăm interacțiunea
 
     try:
         user_id = str(interaction.user.id)
