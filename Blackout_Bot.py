@@ -160,12 +160,8 @@ user_recent_messages = defaultdict(deque)
 
 
 def generate_daily_quest():
-    if random.random() < 0.15:  # 15% șansă pentru quest rar
-        rare_quests = [q for q in DAILY_QUESTS if q.get("rare")]
-        if rare_quests:
-            return random.choice(rare_quests)
-    normal_quests = [q for q in DAILY_QUESTS if not q.get("rare")]
-    return random.choice(normal_quests)
+    filtered = [q for q in DAILY_QUESTS if q["type"] in {"messages", "reactions"}]
+    return random.choice(filtered)
 
 
 if os.path.exists(data_file):
@@ -413,194 +409,180 @@ async def voice_xp_error(error):
 @bot.event
 async def on_raw_reaction_add(payload):
     if payload.user_id == bot.user.id:
-        return  # ignoră reacțiile botului
+        return
 
     user_id = str(payload.user_id)
-
     quest = quest_data.get(user_id)
-    if isinstance(quest, dict) and quest.get("type") == "reaction":
-        if quest.get("progress", 0) < quest.get("target", 0):
+
+    if quest and quest.get("type") == "reactions":
+        quest["progress"] = quest.get("progress", 0) + 1
+
+        if quest["progress"] >= quest["target"]:
+            member = await bot.fetch_user(payload.user_id)
+            await finalize_quest(member)
+            quest_data[user_id] = {}
+        save_quest_data()
+
+    @bot.event
+    async def on_message(message):
+        if message.author.bot:
+            return
+        if not message.guild:
+            return
+
+        user_id = str(message.author.id)
+        now = datetime.now(timezone.utc)
+
+        # Inițializează user_data dacă nu există
+        if user_id not in user_data:
+            user_data[user_id] = {"xp": 0, "level": 0, "rebirth": 0}
+
+        # Inițializează coada de mesaje recente pentru anti-spam
+        if user_id not in user_recent_messages:
+            user_recent_messages[user_id] = deque()
+
+        recent = user_recent_messages[user_id]
+        recent.append(message)
+
+        # Curăță mesaje vechi (> spam_limit_seconds)
+        while recent and (now - recent[0].created_at).total_seconds() > spam_limit_seconds:
+            recent.popleft()
+
+        # Detectare spam
+        if len(recent) > spam_limit_count:
+            try:
+                for msg in list(recent):
+                    try:
+                        await msg.delete()
+                    except:
+                        pass
+                recent.clear()
+                warn_msg = await message.channel.send(
+                    f"{message.author.mention}, nu spamma, te rog! Vei fi mutat temporar."
+                )
+                if isinstance(message.author, discord.Member):
+                    await message.author.timeout(timedelta(seconds=30), reason="Spam detectat")
+                await warn_msg.delete(delay=5)
+            except Exception as e:
+                print(f"[Eroare spam] {e}")
+            return  # Nu mai procesăm dacă e spam
+
+        # --- ADĂUGĂ XP NORMAL IMEDIAT după anti-spam ---
+        user_data[user_id]["xp"] += 5
+
+        if user_id not in monthly_data:
+            monthly_data[user_id] = {"xp": 0}
+        monthly_data[user_id]["xp"] += 10
+        save_monthly_data()
+
+        # Quest progres
+        quest = quest_data.get(user_id, {})
+
+        # 1. Questuri tip "text_messages" sau "messages" (unificat)
+        if quest.get("type") in ["text_messages", "messages"] and quest.get("progress", 0) < quest.get("target", 0):
             quest["progress"] += 1
-            quest_data[user_id]["progress"] = quest["progress"]
-            save_quest_data()
-
-            if quest["progress"] >= quest["target"]:
-                # Dă XP
-                user_data.setdefault(user_id, {"xp": 0, "level": 0, "rebirth": 0})
-                user_data[user_id]["xp"] += quest["reward"]
-                save_user_data()
-
-                guild = bot.get_guild(payload.guild_id)
-                member = guild.get_member(payload.user_id)
-                channel = guild.get_channel(text_channel_id)
-                if member and channel:
-                    await channel.send(
-                        f"🎉 {member.mention} ai finalizat misiunea cu reacții și ai primit {quest['reward']} XP!"
-                    )
-
-                quest_data[user_id] = {}  # Reset
+            if quest["progress"] >= quest.get("target", 0):
+                await finalize_quest(message.author)
+            else:
+                quest_data[user_id]["progress"] = quest["progress"]
                 save_quest_data()
 
-@bot.event
-async def on_message(message):
-    if message.author.bot:
-        return
-    if not message.guild:
-        return
+        # 2. mention_friend
+        if quest.get("type") == "mention_friend" and quest.get("progress", 0) < quest.get("target", 0):
+            if message.mentions:
+                # Considerăm că menționarea oricărui utilizator (altul decât autorul) contează
+                if any(m.id != message.author.id for m in message.mentions):
+                    quest["progress"] += 1
+                    if quest["progress"] >= quest.get("target", 0):
+                        await finalize_quest(message.author)
+                    else:
+                        quest_data[user_id]["progress"] = quest["progress"]
+                        save_quest_data()
 
-    user_id = str(message.author.id)
-    now = datetime.now(timezone.utc)
-
-    # Inițializează user_data dacă nu există
-    if user_id not in user_data:
-        user_data[user_id] = {"xp": 0, "level": 0, "rebirth": 0}
-
-    # Inițializează coada de mesaje recente pentru anti-spam
-    if user_id not in user_recent_messages:
-        user_recent_messages[user_id] = deque()
-
-    recent = user_recent_messages[user_id]
-    recent.append(message)
-
-    # Curăță mesaje vechi (> spam_limit_seconds)
-    while recent and (now - recent[0].created_at).total_seconds() > spam_limit_seconds:
-        recent.popleft()
-
-    # Detectare spam
-    if len(recent) > spam_limit_count:
-        try:
-            for msg in list(recent):
+        # 3. reply
+        if quest.get("type") == "reply" and quest.get("progress", 0) < quest.get("target", 0):
+            if message.reference and message.reference.message_id:
                 try:
-                    await msg.delete()
-                except:
-                    pass
-            recent.clear()
-            warn_msg = await message.channel.send(
-                f"{message.author.mention}, nu spamma, te rog! Vei fi mutat temporar."
-            )
-            if isinstance(message.author, discord.Member):
-                await message.author.timeout(timedelta(seconds=30), reason="Spam detectat")
-            await warn_msg.delete(delay=5)
-        except Exception as e:
-            print(f"[Eroare spam] {e}")
-        return  # Nu mai procesăm dacă e spam
+                    ref_msg = await message.channel.fetch_message(message.reference.message_id)
+                except discord.NotFound:
+                    return  # Mesajul răspuns a fost șters
+                if ref_msg.author.id != message.author.id:
+                    quest["progress"] += 1
+                    if quest["progress"] >= quest.get("target", 0):
+                        await finalize_quest(message.author)
+                    else:
+                        quest_data[user_id]["progress"] = quest["progress"]
+                        save_quest_data()
 
-    # --- ADĂUGĂ XP NORMAL IMEDIAT după anti-spam ---
-    user_data[user_id]["xp"] += 5
-
-    if user_id not in monthly_data:
-        monthly_data[user_id] = {"xp": 0}
-    monthly_data[user_id]["xp"] += 10
-    save_monthly_data()
-
-    # Quest progres
-    quest = quest_data.get(user_id, {})
-
-    # 1. Questuri tip "text_messages" sau "messages" (unificat)
-    if quest.get("type") in ["text_messages", "messages"] and quest.get("progress", 0) < quest.get("target", 0):
-        quest["progress"] += 1
-        if quest["progress"] >= quest.get("target", 0):
-            await finalize_quest(message.author)
-        else:
-            quest_data[user_id]["progress"] = quest["progress"]
-            save_quest_data()
-
-    # 2. mention_friend
-    if quest.get("type") == "mention_friend" and quest.get("progress", 0) < quest.get("target", 0):
-        if message.mentions:
-            # Considerăm că menționarea oricărui utilizator (altul decât autorul) contează
-            if any(m.id != message.author.id for m in message.mentions):
-                quest["progress"] += 1
-                if quest["progress"] >= quest.get("target", 0):
-                    await finalize_quest(message.author)
-                else:
-                    quest_data[user_id]["progress"] = quest["progress"]
-                    save_quest_data()
-
-    # 3. reply
-    if quest.get("type") == "reply" and quest.get("progress", 0) < quest.get("target", 0):
-        if message.reference and message.reference.message_id:
-            try:
-                ref_msg = await message.channel.fetch_message(message.reference.message_id)
-            except discord.NotFound:
-                return  # Mesajul răspuns a fost șters
-            if ref_msg.author.id != message.author.id:
-                quest["progress"] += 1
-                if quest["progress"] >= quest.get("target", 0):
-                    await finalize_quest(message.author)
-                else:
-                    quest_data[user_id]["progress"] = quest["progress"]
-                    save_quest_data()
-
-    # --- NIVELARE (level up) cu while, pentru multiple niveluri ---
-    xp = user_data[user_id]["xp"]
-    level = user_data[user_id]["level"]
-    rebirth = user_data[user_id].get("rebirth", 0)
-
-    next_level_xp = xp_needed(level + 1)
-    channel = message.guild.get_channel(text_channel_id)
-
-    while xp >= next_level_xp:
-        xp -= next_level_xp
-        level += 1
-        user_data[user_id]["level"] = level
-        user_data[user_id]["xp"] = xp
-
-        # Reset rebirth dacă nivelul atinge 25
-        if level >= 25:
-            user_data[user_id]["level"] = 0
-            user_data[user_id]["xp"] = 0
-            user_data[user_id]["rebirth"] = rebirth + 1
-            rebirth = user_data[user_id]["rebirth"]
-
-            if channel:
-                await channel.send(
-                    f"🔁 {message.author.mention} a făcut **Rebirth {rebirth}** și nivelul a fost resetat!"
-                )
-
-            # Setează rolul de rebirth după ID
-            role_id = rebirth_roles.get(rebirth)
-            if role_id:
-                rb_role = message.guild.get_role(role_id)
-                if rb_role and rb_role not in message.author.roles:
-                    await message.author.add_roles(rb_role)
-
-            # Elimină celelalte roluri de rebirth
-            for lvl, rid in rebirth_roles.items():
-                if lvl != rebirth:
-                    old_role = message.guild.get_role(rid)
-                    if old_role and old_role in message.author.roles:
-                        await message.author.remove_roles(old_role)
-
-            # Reset next_level_xp după rebirth
-            next_level_xp = xp_needed(user_data[user_id]["level"] + 1)
-            break  # Ieșim după rebirth
-
-        else:
-            # Adaugă rol pentru nivelul nou
-            role_id = role_nivele.get(level)
-            role = message.guild.get_role(role_id) if role_id else None
-            if role and role not in message.author.roles:
-                await message.author.add_roles(role)
-                if channel:
-                    await channel.send(
-                        f"{message.author.mention} a ajuns la nivelul {level} și a primit rolul {role.name}! 🎉"
-                    )
-            elif channel and level != 1:
-                await channel.send(
-                    f"{message.author.mention} a ajuns la nivelul {level}! 🎉"
-                )
+        # --- NIVELARE (level up) cu while, pentru multiple niveluri ---
+        xp = user_data[user_id]["xp"]
+        level = user_data[user_id]["level"]
+        rebirth = user_data[user_id].get("rebirth", 0)
 
         next_level_xp = xp_needed(level + 1)
+        channel = message.guild.get_channel(text_channel_id)
 
-    user_data[user_id]["xp"] = xp
+        while xp >= next_level_xp:
+            xp -= next_level_xp
+            level += 1
+            user_data[user_id]["level"] = level
+            user_data[user_id]["xp"] = xp
 
-    # Salvează datele după orice modificare
-    save_user_data()
-    save_quest_data()
+            # Reset rebirth dacă nivelul atinge 25
+            if level >= 25:
+                user_data[user_id]["level"] = 0
+                user_data[user_id]["xp"] = 0
+                user_data[user_id]["rebirth"] = rebirth + 1
+                rebirth = user_data[user_id]["rebirth"]
 
-    # Permite procesarea altor comenzi
-    await bot.process_commands(message)
+                if channel:
+                    await channel.send(
+                        f"🔁 {message.author.mention} a făcut **Rebirth {rebirth}** și nivelul a fost resetat!"
+                    )
+
+                # Setează rolul de rebirth după ID
+                role_id = rebirth_roles.get(rebirth)
+                if role_id:
+                    rb_role = message.guild.get_role(role_id)
+                    if rb_role and rb_role not in message.author.roles:
+                        await message.author.add_roles(rb_role)
+
+                # Elimină celelalte roluri de rebirth
+                for lvl, rid in rebirth_roles.items():
+                    if lvl != rebirth:
+                        old_role = message.guild.get_role(rid)
+                        if old_role and old_role in message.author.roles:
+                            await message.author.remove_roles(old_role)
+
+                # Reset next_level_xp după rebirth
+                next_level_xp = xp_needed(user_data[user_id]["level"] + 1)
+                break  # Ieșim după rebirth
+
+            else:
+                # Adaugă rol pentru nivelul nou
+                role_id = role_nivele.get(level)
+                role = message.guild.get_role(role_id) if role_id else None
+                if role and role not in message.author.roles:
+                    await message.author.add_roles(role)
+                    if channel:
+                        await channel.send(
+                            f"{message.author.mention} a ajuns la nivelul {level} și a primit rolul {role.name}! 🎉"
+                        )
+                elif channel and level != 1:
+                    await channel.send(
+                        f"{message.author.mention} a ajuns la nivelul {level}! 🎉"
+                    )
+
+            next_level_xp = xp_needed(level + 1)
+
+        user_data[user_id]["xp"] = xp
+
+        # Salvează datele după orice modificare
+        save_user_data()
+        save_quest_data()
+
+        # Permite procesarea altor comenzi
+        await bot.process_commands(message)
 
 @bot.event
 async def on_reaction_add(reaction, user):
@@ -774,13 +756,15 @@ async def daily(interaction: discord.Interaction):
         user_id = str(interaction.user.id)
         today = datetime.utcnow().date()
 
+        # Inițializează dacă nu există
         if user_id not in user_data:
-            user_data.setdefault(user_id, {"xp": 0, "level": 0, "rebirth": 0})
+            user_data[user_id] = {"xp": 0, "level": 0, "rebirth": 0}
 
         last_claim_str = user_data[user_id].get("last_daily", "2000-01-01")
         last_claim = datetime.strptime(last_claim_str, "%Y-%m-%d").date()
 
-        if today > last_claim:
+        # Dacă e o nouă zi sau nu are quest activ sau questul a fost finalizat
+        if today > last_claim or not quest_data.get(user_id) or quest_data[user_id] == {}:
             quest = generate_daily_quest()
             user_data[user_id]["last_daily"] = str(today)
 
@@ -791,20 +775,32 @@ async def daily(interaction: discord.Interaction):
                 "reward": quest["reward"],
                 "progress": 0
             }
+
             save_quest_data()
             save_user_data()
 
             await interaction.response.send_message(
                 f"🗓️ Misiunea ta zilnică: **{quest['quest']}**\n"
-                f"Recompensă: {quest['reward']} XP\n"
-                "Succes!"
+                f"🎁 Recompensă: `{quest['reward']} XP`\n"
+                "📈 Progres: `0 / {}`\nSucces!".format(quest['target'])
             )
         else:
-            await interaction.response.send_message(
-                "⏳ Ai deja o misiune zilnică activă sau ai revendicat deja azi. Revino mâine!"
-            )
+            current_quest = quest_data.get(user_id)
+            if current_quest:
+                await interaction.response.send_message(
+                    f"⏳ Ai deja o misiune zilnică activă:\n"
+                    f"📌 **{current_quest['quest']}**\n"
+                    f"Progres: `{current_quest.get('progress', 0)} / {current_quest.get('target', 0)}`\n"
+                    "Revino mâine pentru o nouă misiune!"
+                )
+            else:
+                await interaction.response.send_message(
+                    "⏳ Ai revendicat deja o misiune azi. Revino mâine!"
+                )
+
     except Exception as e:
-        await interaction.response.send_message(f"❌ A apărut o eroare: `{e}`")
+        await interaction.response.send_message(f"❌ A apărut o eroare: `{e}`", ephemeral=True)
+
 
 @app_commands.command(
     name="sent_anunt",
@@ -876,6 +872,28 @@ from discord import app_commands, Interaction
 
 OWNER_ID = 711202139434647642  # Replace with your Discord user ID
 
+@blackout.command(name="quest", description="Afișează progresul tău la misiunea zilnică")
+async def quest_status(interaction: discord.Interaction):
+    user_id = str(interaction.user.id)
+    quest = quest_data.get(user_id)
+
+    if not quest:
+        await interaction.response.send_message("❌ Nu ai nicio misiune activă.", ephemeral=True)
+        return
+
+    progres = quest.get("progress", 0)
+    target = quest.get("target", 1)
+    bar_length = 20
+    filled = int(bar_length * progres / target)
+    bar = "█" * filled + "░" * (bar_length - filled)
+
+    await interaction.response.send_message(
+        f"📌 Misiunea ta: **{quest['quest']}**\n"
+        f"📈 Progres: `{progres}/{target}`\n"
+        f"[{bar}]\n"
+        f"🎁 Recompensă: **{quest['reward']} XP**",
+        ephemeral=True
+    )
 
 @blackout.command(name="leaderboard_lunar",
                   description="Vezi top 10 utilizatori după XP lunar")
