@@ -144,7 +144,7 @@ async def finalize_quest(user: discord.User | discord.Member):
     if not quest:
         return
     if user_id not in user_data:
-        return  # Previi key error
+        return
 
     reward = int(quest.get("reward", 0))
     user_data[user_id]["xp"] += reward
@@ -155,8 +155,9 @@ async def finalize_quest(user: discord.User | discord.Member):
             f"🎉 {user.mention} ai finalizat misiunea și ai primit {reward} XP!"
         )
 
-    # Resetează progresul pentru a permite repetarea quest-ului
-    quest["progress"] = 0
+    # Nu reseta progresul aici!
+    quest["completed"] = True  # marchează finalizarea
+
     quest_data[user_id] = quest
 
     save_quest_data()
@@ -420,13 +421,19 @@ async def on_member_join(member):
     active_quests = quest_data.get(user_id, {}).get("active_quests", [])
 
     for quest in active_quests:
-        if quest.get("type") == "invite_friend" and quest.get("progress", 0) < quest.get("target", 0):
-            quest["progress"] += 1
-            if quest["progress"] >= quest.get("target", 0):
-                await finalize_quest(inviter, quest)
-            else:
-                quest_data[user_id]["progress"] = quest["progress"]
-                save_quest_data()
+        if quest.get("type") == "invite_friend" and not quest.get("completed", False):
+            if quest.get("progress", 0) < quest.get("target", 0):
+                quest["progress"] += 1
+
+                if quest["progress"] >= quest["target"]:
+                    quest["completed"] = True
+                    user_data[str(inviter.id)]["xp"] += quest["reward"]
+                    save_quest_data()
+                    save_user_data()
+                    await finalize_quest(inviter, quest)
+                else:
+                    quest_data[str(inviter.id)]["progress"] = quest["progress"]
+                    save_quest_data()
 
 
 @bot.event
@@ -554,54 +561,80 @@ async def on_message(message):
 
     # 1. Questuri tip "text_messages" sau "messages"
     if quest.get("type") in ["text_messages", "messages"] and quest.get("progress", 0) < quest.get("target", 0):
+        if quest.get("completed"):
+            return
         quest["progress"] += 1
-        if quest["progress"] >= quest.get("target", 0):
-            await finalize_quest(message.author)
+        target = quest.get("target", 0)
+        if quest["progress"] >= target:
+            quest["completed"] = True
+            user_data[str(message.author.id)]["xp"] += quest["reward"]
+            save_user_data()
+            save_quest_data()
+            await finalize_quest(message.author, quest)
         else:
-            quest_data[user_id]["progress"] = quest["progress"]
+            quest_data[str(message.author.id)]["progress"] = quest["progress"]
             save_quest_data()
 
     # 2. mention_friend
     if quest.get("type") == "mention_friend" and quest.get("progress", 0) < quest.get("target", 0):
+        if quest.get("completed"):
+            return
         if "@" in message.content:
             quest["progress"] += 1
-            if quest["progress"] >= quest.get("target", 0):
-                await finalize_quest(message.author)
+            target = quest.get("target", 0)
+            if quest["progress"] >= target:
+                quest["completed"] = True
+                user_data[str(message.author.id)]["xp"] += quest["reward"]
+                save_user_data()
+                save_quest_data()
+                await finalize_quest(message.author, quest)
             else:
-                quest_data[user_id]["progress"] = quest["progress"]
+                quest_data[str(message.author.id)]["progress"] = quest["progress"]
                 save_quest_data()
 
     # 3. reply
     if quest.get("type") == "reply" and quest.get("progress", 0) < quest.get("target", 0):
+        if quest.get("completed"):
+            return
         if message.reference and message.reference.message_id:
             try:
                 ref_msg = await message.channel.fetch_message(message.reference.message_id)
+                if ref_msg.author.id != message.author.id:
+                    quest["progress"] += 1
+                    target = quest.get("target", 0)
+                    if quest["progress"] >= target:
+                        quest["completed"] = True
+                        user_data[str(message.author.id)]["xp"] += quest["reward"]
+                        save_user_data()
+                        save_quest_data()
+                        await finalize_quest(message.author, quest)
+                    else:
+                        quest_data[str(message.author.id)]["progress"] = quest["progress"]
+                        save_quest_data()
             except discord.NotFound:
-                return
-            if ref_msg.author.id != message.author.id:
-                quest["progress"] += 1
-                if quest["progress"] >= quest.get("target", 0):
-                    await finalize_quest(message.author)
-                else:
-                    quest_data[user_id]["progress"] = quest["progress"]
-                    save_quest_data()
+                pass
 
     # 4. bump
     if quest.get("type") == "bump_server" and quest.get("progress", 0) < quest.get("target", 0):
+        if quest.get("completed"):
+            return
         if (
                 message.channel.id == BUMP_CHANNEL_ID and
                 message.author.id == DISBOARD_ID and
                 message.embeds and
                 message.interaction and
                 message.interaction.user.id == message.author.id
-        # Sau folosește .user.id == user_id dacă ai userul salvat
         ):
             quest["progress"] += 1
-
-            if quest["progress"] >= quest.get("target", 0):
+            target = quest.get("target", 0)
+            if quest["progress"] >= target:
+                quest["completed"] = True
+                user_data[str(message.interaction.user.id)]["xp"] += quest["reward"]
+                save_user_data()
+                save_quest_data()
                 await finalize_quest(message.interaction.user, quest)
             else:
-                quest_data[user_id]["progress"] = quest["progress"]
+                quest_data[str(message.interaction.user.id)]["progress"] = quest["progress"]
                 save_quest_data()
 
     # --- NIVELARE (level up) cu while, pentru multiple niveluri ---
@@ -683,16 +716,20 @@ async def on_reaction_add(reaction, user):
     quest = quest_data.get(user_id)
 
     if quest and isinstance(quest, dict) and quest.get("type") == "reaction":
-        progress = quest.get("progress", 0) + 1
-        quest["progress"] = progress
-        quest_data[user_id] = quest
-        save_quest_data()
+        if quest.get("completed"):  # ✅ PREVIENE ABUZUL
+            return
 
-        if progress >= quest.get("target", 0):
-            await finalize_quest(user)
+        quest["progress"] += 1
+
+        if quest["progress"] >= quest.get("target", 0):
+            quest["completed"] = True  # ✅ MARCHEAZĂ COMPLETAREA
+            user_data[user_id]["xp"] += quest["reward"]
+            save_user_data()
+            save_quest_data()
+            await finalize_quest(user, quest)
         else:
-            # Poți trimite un mesaj privat sau log, dacă vrei
-            print(f"[REACTION QUEST] {user.display_name} progres: {progress}/{quest.get('target')}")
+            save_quest_data()
+            print(f"[REACTION QUEST] {user.display_name} progres: {quest['progress']}/{quest['target']}")
 
 
 @blackout.command(name="rank", description="Vezi nivelul și XP-ul unui membru")
@@ -907,7 +944,7 @@ async def daily(interaction: discord.Interaction):
         last_claim_str = user_data[user_id].get("last_daily", "2000-01-01")
         last_claim = datetime.strptime(last_claim_str, "%Y-%m-%d").date()
 
-        if today > last_claim or not quest_data.get(user_id) or quest_data[user_id] == {}:
+        if today > last_claim or not quest_data.get(user_id) or quest_data[user_id].get("completed", True):
             quest = generate_daily_quest()
             user_data[user_id]["last_daily"] = str(today)
 
@@ -916,7 +953,8 @@ async def daily(interaction: discord.Interaction):
                 "type": quest["type"],
                 "target": quest["target"],
                 "reward": quest["reward"],
-                "progress": 0
+                "progress": 0,
+                "completed": False
             }
 
             save_quest_data()
