@@ -924,7 +924,11 @@ async def daily(interaction: discord.Interaction):
                     "⏳ Ai revendicat deja o misiune azi. Revino mâine!"
                 )
 
+
     except Exception as e:
+
+        print(f"[EROARE DAILY] {e}")
+
         await interaction.followup.send(f"❌ A apărut o eroare: `{e}`", ephemeral=True)
 
 
