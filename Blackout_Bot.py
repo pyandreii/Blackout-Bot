@@ -919,7 +919,7 @@ async def daily(interaction: discord.Interaction):
                 )
 
     except Exception as e:
-        await interaction.response.send_message(f"❌ A apărut o eroare: `{e}`", ephemeral=True)
+        await interaction.followup.send(f"❌ A apărut o eroare: `{e}`", ephemeral=True)
 
 
 @app_commands.command(
