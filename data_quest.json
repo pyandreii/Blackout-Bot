@@ -3,5 +3,18 @@
     "1074388016182870117": {},
     "1094241583932657666": {},
     "1171568170604179507": {},
-    "711202139434647642": {}
+    "711202139434647642": {
+        "quest": "Fii activ \u00een voice chat timp de 30 minute",
+        "type": "voice_minutes",
+        "target": 30,
+        "reward": 200,
+        "progress": 4
+    },
+    "825368073388294145": {
+        "quest": "R\u0103spunde la o \u00eentrebare \u00een chat",
+        "type": "reply",
+        "target": 1,
+        "reward": 100,
+        "progress": 0
+    }
 }
