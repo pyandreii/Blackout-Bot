@@ -142,7 +142,10 @@ async def finalize_quest(user: discord.User | discord.Member):
             f"🎉 {user.mention} ai finalizat misiunea și ai primit {reward} XP!"
         )
 
-    quest_data[user_id] = {}
+    # Resetează progresul pentru a permite repetarea quest-ului
+    quest["progress"] = 0
+    quest_data[user_id] = quest
+
     save_quest_data()
     save_user_data()
 
@@ -160,7 +163,8 @@ user_recent_messages = defaultdict(deque)
 
 
 def generate_daily_quest():
-    filtered = [q for q in DAILY_QUESTS if q["type"] in {"messages", "reactions"}]
+    allowed_types = {"messages", "reactions", "voice_minutes", "mention_friend", "reply"}
+    filtered = [q for q in DAILY_QUESTS if q["type"] in allowed_types]
     return random.choice(filtered)
 
 
@@ -479,13 +483,14 @@ async def on_raw_reaction_add(payload):
         quest = quest_data.get(user_id, {})
 
         # 1. Questuri tip "text_messages" sau "messages" (unificat)
-        if quest.get("type") in ["text_messages", "messages"] and quest.get("progress", 0) < quest.get("target", 0):
-            quest["progress"] += 1
-            if quest["progress"] >= quest.get("target", 0):
-                await finalize_quest(message.author)
-            else:
-                quest_data[user_id]["progress"] = quest["progress"]
-                save_quest_data()
+        if quest.get("type") == "mention_friend" and quest.get("progress", 0) < quest.get("target", 0):
+            if message.mentions and any(m.id != message.author.id for m in message.mentions):
+                quest["progress"] += 1
+                if quest["progress"] >= quest.get("target", 0):
+                    await finalize_quest(message.author, quest)
+                else:
+                    quest_data[user_id]["progress"] = quest["progress"]
+                    save_quest_data()
 
         # 2. mention_friend
         if quest.get("type") == "mention_friend" and quest.get("progress", 0) < quest.get("target", 0):
@@ -505,11 +510,11 @@ async def on_raw_reaction_add(payload):
                 try:
                     ref_msg = await message.channel.fetch_message(message.reference.message_id)
                 except discord.NotFound:
-                    return  # Mesajul răspuns a fost șters
+                    return
                 if ref_msg.author.id != message.author.id:
                     quest["progress"] += 1
                     if quest["progress"] >= quest.get("target", 0):
-                        await finalize_quest(message.author)
+                        await finalize_quest(message.author, quest)
                     else:
                         quest_data[user_id]["progress"] = quest["progress"]
                         save_quest_data()
