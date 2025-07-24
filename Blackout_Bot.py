@@ -1018,6 +1018,34 @@ async def showdata(interaction: Interaction):
             )
     else:
         await interaction.response.send_message(f"```json\n{data_str}\n```", ephemeral=True)
+        
+@blackout.command(
+    name="rebirth",
+    description="Efectuează Rebirth dacă ai nivelul 30"
+)
+async def rebirth(interaction: Interaction):
+    user_id = interaction.user.id
+    data = user_data.get(user_id)
+
+    if not data or data.get("level", 0) < 30:
+        await interaction.response.send_message(
+            "Trebuie să ai nivelul 30 pentru a face Rebirth.", ephemeral=True
+        )
+        return
+
+    view = RebirthConfirmView(user_id)
+    await interaction.response.send_message(
+        f"{interaction.user.mention}, ești sigur că vrei să faci Rebirth? Nivelul și XP vor fi resetate.", 
+        view=view,
+        ephemeral=True
+    )
+
+    await view.wait()
+
+    if view.value is None:
+        await interaction.followup.send(
+            "Timpul pentru confirmare a expirat.", ephemeral=True
+        )
 
 @blackout.command(
     name="showmonthly",
@@ -1053,25 +1081,6 @@ async def showmonthly(interaction: Interaction):
             )
     else:
         await interaction.response.send_message(f"```json\n{data_str}\n```", ephemeral=True)
-
-@bot.command()
-async def rebirth(ctx):
-    user_id = ctx.author.id
-    data = user_data.get(user_id)
-
-    if not data or data.get("level", 0) < 30:
-        await ctx.send("Trebuie să ai nivelul 30 pentru a face Rebirth.")
-        return
-
-    view = RebirthConfirmView(user_id)
-    await ctx.send(f"{ctx.author.mention}, ești sigur că vrei să faci Rebirth? Nivelul și XP vor fi resetate.", view=view)
-
-    # Așteaptă confirmarea sau anularea
-    await view.wait()
-
-    if view.value is None:
-        # Timeout
-        await ctx.send("Timpul pentru confirmare a expirat.")
 
 # Then register this group in your bot setup code:
 @blackout.command(
