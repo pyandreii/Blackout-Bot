@@ -178,12 +178,18 @@ user_recent_messages = defaultdict(deque)
 def generate_daily_quest():
     allowed_types = {"messages", "reactions", "voice_minutes", "mention_friend", "reply", "bump_server", "invite_friend"}
     filtered = []
+
     for q in DAILY_QUESTS:
         if q["type"] in allowed_types:
-            if q["type"] == "invite_friend" and random.random() < 0.05:  # 5% șansă
+            if q["type"] == "invite_friend":
+                if random.random() < 0.05:  # 5% șansă
+                    filtered.append(q)
+            else:
                 filtered.append(q)
-            elif q["type"] != "invite_friend":
-                filtered.append(q)
+
+    if not filtered:
+        raise ValueError("Nu există misiuni valide în DAILY_QUESTS!")
+
     return random.choice(filtered)
 
 
