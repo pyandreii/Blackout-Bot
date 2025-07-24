@@ -80,6 +80,11 @@ DAILY_QUESTS = [{
     "type": "bump_server",
     "target": 1,
     "reward": 100
+}, {
+    "quest": "Invită un prieten pe server",
+    "type": "invite_friend",
+    "target": 1,
+    "reward": 400
 }
 ]
 
@@ -171,8 +176,14 @@ user_recent_messages = defaultdict(deque)
 
 
 def generate_daily_quest():
-    allowed_types = {"messages", "reactions", "voice_minutes", "mention_friend", "reply", "bump_server"}
-    filtered = [q for q in DAILY_QUESTS if q["type"] in allowed_types]
+    allowed_types = {"messages", "reactions", "voice_minutes", "mention_friend", "reply", "bump_server", "invite_friend"}
+    filtered = []
+    for q in DAILY_QUESTS:
+        if q["type"] in allowed_types:
+            if q["type"] == "invite_friend" and random.random() < 0.05:  # 5% șansă
+                filtered.append(q)
+            elif q["type"] != "invite_friend":
+                filtered.append(q)
     return random.choice(filtered)
 
 
@@ -382,11 +393,38 @@ async def check_month_reset():
 
         print("🔁 Lunar leaderboard resetat!")
 
+invite_cache = {}
+
+async def cache_invites(guild):
+    invite_cache[guild.id] = await guild.invites()
+
+
+async def on_member_join(member):
+    inviter = await get_inviter(member)
+    if not inviter:
+        return
+
+    user_id = str(inviter.id)
+    active_quests = quest_data.get(user_id, {}).get("active_quests", [])
+
+    for quest in active_quests:
+        if quest.get("type") == "invite_friend" and quest.get("progress", 0) < quest.get("target", 0):
+            quest["progress"] += 1
+            if quest["progress"] >= quest.get("target", 0):
+                await finalize_quest(inviter, quest)
+            else:
+                quest_data[user_id]["progress"] = quest["progress"]
+                save_quest_data()
+
+
 @bot.event
 async def on_ready():
     print(f"✅ Bot conectat ca {bot.user}")
     await bot.change_presence(activity=discord.CustomActivity(name="❤️ Vă iubesc, BlackOut RO! Mereu voi fi aici"))
     print(f"Guild-uri pe care sunt: {[guild.id for guild in bot.guilds]}")
+
+    for guild in bot.guilds:
+        await cache_invites(guild)
 
     if not give_voice_xp.is_running():
         give_voice_xp.start()
@@ -433,6 +471,19 @@ async def on_raw_reaction_add(payload):
             await finalize_quest(member)
             quest_data[user_id] = {}
         save_quest_data()
+
+async def get_inviter(member):
+    guild = member.guild
+    old_invites = invite_cache.get(guild.id, [])
+    new_invites = await guild.invites()
+
+    invite_cache[guild.id] = new_invites  # update cache
+
+    for invite in new_invites:
+        for old_inv in old_invites:
+            if invite.code == old_inv.code and invite.uses > old_inv.uses:
+                return invite.inviter
+    return None
 
 @bot.event
 async def on_message(message):
