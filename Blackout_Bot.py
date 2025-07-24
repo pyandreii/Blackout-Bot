@@ -15,6 +15,8 @@ ID_SERVER_PRINCIPAL = 1372682829074530335
 text_channel_id = 1389616154259226625
 CO_OWNER_ROLE_ID = 1397521192092700702
 REQUIRED_ROLE_ID = 1397521192092700702
+BUMP_CHANNEL_ID = 1390006025532211310
+DISBOARD_ID = 302050872383242240
 
 role_nivele = {
     1: 1390238119734935673,
@@ -73,7 +75,13 @@ DAILY_QUESTS = [{
     "type": "reply",
     "target": 1,
     "reward": 100
-}]
+},  {
+    "quest": "Da bump la server",
+    "type": "bump_server",
+    "target": 1,
+    "reward": 100
+}
+]
 
 data_file = "data_nou.json"
 quest_data_file = "data_quest.json"
@@ -163,7 +171,7 @@ user_recent_messages = defaultdict(deque)
 
 
 def generate_daily_quest():
-    allowed_types = {"messages", "reactions", "voice_minutes", "mention_friend", "reply"}
+    allowed_types = {"messages", "reactions", "voice_minutes", "mention_friend", "reply", "bump_server"}
     filtered = [q for q in DAILY_QUESTS if q["type"] in allowed_types]
     return random.choice(filtered)
 
@@ -514,6 +522,24 @@ async def on_message(message):
                 else:
                     quest_data[user_id]["progress"] = quest["progress"]
                     save_quest_data()
+
+    # 4. bump
+    if quest.get("type") == "bump_server" and quest.get("progress", 0) < quest.get("target", 0):
+        if (
+                message.channel.id == BUMP_CHANNEL_ID and
+                message.author.id == DISBOARD_ID and
+                message.embeds and
+                message.interaction and
+                message.interaction.user.id == message.author.id
+        # Sau folosește .user.id == user_id dacă ai userul salvat
+        ):
+            quest["progress"] += 1
+
+            if quest["progress"] >= quest.get("target", 0):
+                await finalize_quest(message.interaction.user, quest)
+            else:
+                quest_data[user_id]["progress"] = quest["progress"]
+                save_quest_data()
 
     # --- NIVELARE (level up) cu while, pentru multiple niveluri ---
     xp = user_data[user_id]["xp"]
@@ -1018,7 +1044,7 @@ async def showdata(interaction: Interaction):
             )
     else:
         await interaction.response.send_message(f"```json\n{data_str}\n```", ephemeral=True)
-        
+
 @blackout.command(
     name="rebirth",
     description="Efectuează Rebirth dacă ai nivelul 30"
@@ -1035,7 +1061,7 @@ async def rebirth(interaction: Interaction):
 
     view = RebirthConfirmView(user_id)
     await interaction.response.send_message(
-        f"{interaction.user.mention}, ești sigur că vrei să faci Rebirth? Nivelul și XP vor fi resetate.", 
+        f"{interaction.user.mention}, ești sigur că vrei să faci Rebirth? Nivelul și XP vor fi resetate.",
         view=view,
         ephemeral=True
     )
