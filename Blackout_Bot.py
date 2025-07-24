@@ -170,6 +170,7 @@ intents.message_content = True
 intents.members = True
 intents.voice_states = True
 
+
 # --- Variabile globale ---
 
 user_recent_messages = defaultdict(deque)
@@ -402,7 +403,12 @@ async def check_month_reset():
 invite_cache = {}
 
 async def cache_invites(guild):
-    invite_cache[guild.id] = await guild.invites()
+    try:
+        invite_cache[guild.id] = await guild.invites()
+        print(f"✅ Cached invites pentru guild: {guild.name} ({guild.id})")
+    except discord.Forbidden:
+        print(f"❌ Botul nu are permisiuni pentru `guild.invites()` în: {guild.name} ({guild.id})")
+        invite_cache[guild.id] = []
 
 
 async def on_member_join(member):
@@ -755,6 +761,17 @@ class RebirthConfirmView(discord.ui.View):
         self.stop()
 
 @bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error):
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send("❌ A apărut o eroare la executarea comenzii.", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ A apărut o eroare la executarea comenzii.", ephemeral=True)
+    except Exception as e:
+        print(f"Error in error handler: {e}")
+
+
+@bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction,
                                error: app_commands.AppCommandError):
     if isinstance(error, app_commands.CheckFailure):
@@ -878,18 +895,19 @@ async def sent(interaction: discord.Interaction, channel: discord.TextChannel,
 
 @blackout.command(name="daily", description="Primește o misiune zilnică aleatorie")
 async def daily(interaction: discord.Interaction):
+    await interaction.followup.send(
+        "❌ A apărut o eroare la executarea comenzii.", ephemeral=True) # Confirmăm interacțiunea imediat, cu loading
+
     try:
         user_id = str(interaction.user.id)
         today = datetime.utcnow().date()
 
-        # Inițializează dacă nu există
         if user_id not in user_data:
             user_data[user_id] = {"xp": 0, "level": 0, "rebirth": 0}
 
         last_claim_str = user_data[user_id].get("last_daily", "2000-01-01")
         last_claim = datetime.strptime(last_claim_str, "%Y-%m-%d").date()
 
-        # Dacă e o nouă zi sau nu are quest activ sau questul a fost finalizat
         if today > last_claim or not quest_data.get(user_id) or quest_data[user_id] == {}:
             quest = generate_daily_quest()
             user_data[user_id]["last_daily"] = str(today)
@@ -905,32 +923,28 @@ async def daily(interaction: discord.Interaction):
             save_quest_data()
             save_user_data()
 
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"🗓️ Misiunea ta zilnică: **{quest['quest']}**\n"
                 f"🎁 Recompensă: `{quest['reward']} XP`\n"
-                "📈 Progres: `0 / {}`\nSucces!".format(quest['target'])
+                f"📈 Progres: `0 / {quest['target']}`\nSucces!"
             )
         else:
             current_quest = quest_data.get(user_id)
             if current_quest:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     f"⏳ Ai deja o misiune zilnică activă:\n"
                     f"📌 **{current_quest['quest']}**\n"
                     f"Progres: `{current_quest.get('progress', 0)} / {current_quest.get('target', 0)}`\n"
                     "Revino mâine pentru o nouă misiune!"
                 )
             else:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     "⏳ Ai revendicat deja o misiune azi. Revino mâine!"
                 )
 
-
     except Exception as e:
-
         print(f"[EROARE DAILY] {e}")
-
         await interaction.followup.send(f"❌ A apărut o eroare: `{e}`", ephemeral=True)
-
 
 @app_commands.command(
     name="sent_anunt",
@@ -957,8 +971,6 @@ async def sent_anunt(interaction: discord.Interaction,
                         icon else discord.Embed.Empty)
 
     await channel.send(embed=embed)
-    await interaction.response.send_message(
-        f"✅ Anunțul a fost trimis în {channel.mention}", ephemeral=True)
 
 
 @blackout.command(name="rules",
