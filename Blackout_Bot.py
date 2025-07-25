@@ -40,52 +40,79 @@ rebirth_roles = {
 }
 
 # --- DAILY QUESTS ---
-DAILY_QUESTS = [{
-    "quest": "Trimite 20 de mesaje pe server",
-    "type": "messages",
-    "target": 20,
-    "reward": 100
-}, {
-    "quest": "Stai 15 minute în voice chat",
-    "type": "voice_minutes",
-    "target": 15,
-    "reward": 120
-}, {
-    "quest": "Trimite 10 mesaje într-un canal text",
-    "type": "messages",
-    "target": 10,
-    "reward": 80
-}, {
-    "quest": "Fii activ în voice chat timp de 30 minute",
-    "type": "voice_minutes",
-    "target": 30,
-    "reward": 200
-}, {
-    "quest": "Dă tag unui prieten într-un mesaj pe server",
-    "type": "mention_friend",
-    "target": 1,
-    "reward": 90
-}, {
-    "quest": "Reacționează la 5 mesaje ale altor membri",
-    "type": "reactions",
-    "target": 5,
-    "reward": 70
-}, {
-    "quest": "Răspunde la o întrebare în chat",
-    "type": "reply",
-    "target": 1,
-    "reward": 100
-},  {
-    "quest": "Da bump la server",
-    "type": "bump_server",
-    "target": 1,
-    "reward": 100
-}, {
-    "quest": "Invită un prieten pe server",
-    "type": "invite_friend",
-    "target": 1,
-    "reward": 400
-}
+DAILY_QUESTS = [
+    {
+        "quest": "Trimite 20 de mesaje pe server",
+        "type": "messages",
+        "target": 20,
+        "reward": 100,
+        "progress": 0,
+        "completed": False
+    },
+    {
+        "quest": "Stai 15 minute în voice chat",
+        "type": "voice_minutes",
+        "target": 15,
+        "reward": 120,
+        "progress": 0,
+        "completed": False
+    },
+    {
+        "quest": "Trimite 10 mesaje într-un canal text",
+        "type": "messages",
+        "target": 10,
+        "reward": 80,
+        "progress": 0,
+        "completed": False
+    },
+    {
+        "quest": "Fii activ în voice chat timp de 30 minute",
+        "type": "voice_minutes",
+        "target": 30,
+        "reward": 200,
+        "progress": 0,
+        "completed": False
+    },
+    {
+        "quest": "Dă tag unui prieten într-un mesaj pe server",
+        "type": "mention_friend",
+        "target": 1,
+        "reward": 90,
+        "progress": 0,
+        "completed": False
+    },
+    {
+        "quest": "Reacționează la 5 mesaje ale altor membri",
+        "type": "reactions",
+        "target": 5,
+        "reward": 70,
+        "progress": 0,
+        "completed": False
+    },
+    {
+        "quest": "Răspunde la o întrebare în chat",
+        "type": "reply",
+        "target": 1,
+        "reward": 100,
+        "progress": 0,
+        "completed": False
+    },
+    {
+        "quest": "Dă bump la server",
+        "type": "bump_server",
+        "target": 1,
+        "reward": 100,
+        "progress": 0,
+        "completed": False
+    },
+    {
+        "quest": "Invită un prieten pe server",
+        "type": "invite_friend",
+        "target": 1,
+        "reward": 400,
+        "progress": 0,
+        "completed": False
+    }
 ]
 
 data_file = "data_nou.json"
