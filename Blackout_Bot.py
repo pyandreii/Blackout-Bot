@@ -139,31 +139,35 @@ def has_required_role():
 
 
 async def finalize_quest(user: discord.User | discord.Member):
-    user_id = str(user.id)
-    quest = quest_data.get(user_id)
-    if not quest:
-        return
+    try:
+        user_id = str(user.id)
+        quest = quest_data.get(user_id)
+        if not quest:
+            print(f"[finalize_quest] Nu am găsit quest pentru user {user_id}")
+            return
+        if user_id not in user_data:
+            print(f"[finalize_quest] Nu am găsit user_data pentru user {user_id}")
+            return
 
-    if user_id not in user_data:
-        return
+        reward = int(quest.get("reward", 0))
+        user_data[user_id]["xp"] += reward
 
-    if quest.get("completed"):
-        return  # Dacă deja e completat, nu mai facem nimic
+        channel = bot.get_channel(text_channel_id)
+        if channel:
+            await channel.send(
+                f"🎉 {user.mention} ai finalizat misiunea și ai primit {reward} XP!"
+            )
+            print(f"[finalize_quest] Mesaj trimis pentru user {user.display_name}")
+        else:
+            print("[finalize_quest] Nu am găsit canalul pentru mesaje")
 
-    reward = int(quest.get("reward", 0))
-    user_data[user_id]["xp"] += reward
+        quest["completed"] = True  # marchează finalizarea
+        quest_data[user_id] = quest
 
-    channel = bot.get_channel(text_channel_id)
-    if channel:
-        await channel.send(
-            f"🎉 {user.mention} ai finalizat misiunea și ai primit {reward} XP!"
-        )
-
-    quest["completed"] = True
-    quest_data[user_id] = quest
-
-    save_quest_data()
-    save_user_data()
+        save_quest_data()
+        save_user_data()
+    except Exception as e:
+        print(f"[finalize_quest] Eroare: {e}")
 
 spam_limit_count = 3
 spam_limit_seconds = 5
