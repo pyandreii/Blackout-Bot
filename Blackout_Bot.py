@@ -167,7 +167,7 @@ async def finalize_quest(user, quest):
 
     except Exception as e:
         print(f"[EROARE finalize_quest] {e}")
-        
+
 spam_limit_count = 3
 spam_limit_seconds = 5
 
@@ -422,7 +422,12 @@ async def on_member_join(member):
         return
 
     user_id = str(inviter.id)
-    active_quests = quest_data.get(user_id, {}).get("active_quests", [])
+    user_quests = quest_data.get(user_id)
+
+    if not user_quests:
+        return
+
+    active_quests = user_quests.get("active_quests", [])
 
     for quest in active_quests:
         if quest.get("type") == "invite_friend" and not quest.get("completed", False):
@@ -431,13 +436,16 @@ async def on_member_join(member):
 
                 if quest["progress"] >= quest["target"]:
                     quest["completed"] = True
-                    user_data[str(inviter.id)]["xp"] += quest["reward"]
-                    save_quest_data()
+                    user_data[user_id]["xp"] += quest.get("reward", 0)
                     save_user_data()
                     await finalize_quest(inviter, quest)
-                else:
-                    quest_data[str(inviter.id)]["progress"] = quest["progress"]
-                    save_quest_data()
+
+                # Nu ai nevoie de `else` aici, doar salvezi quest-urile
+                save_quest_data()
+
+    # Salvează actualizările înapoi în `quest_data`
+    quest_data[user_id]["active_quests"] = active_quests
+    save_quest_data()
 
 
 @bot.event
