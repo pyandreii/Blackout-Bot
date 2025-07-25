@@ -168,6 +168,25 @@ def assign_daily_quest(user_id: str):
 
     save_quest_data()
 
+
+def add_xp(user_id: str, amount: int, source: str = "text"):
+    user_data.setdefault(user_id, {"xp": 0, "level": 0, "rebirth": 0})
+    user_data[user_id]["xp"] += amount
+
+    monthly_data.setdefault(user_id, {"xp": 0, "voice_xp": 0})
+
+    if source == "voice":
+        monthly_data[user_id]["voice_xp"] += amount
+    else:
+        monthly_data[user_id]["xp"] += amount
+
+    save_user_data()
+    save_monthly_data()
+    
+def get_total_monthly_xp(user_id: str) -> int:
+    data = monthly_data.get(user_id, {})
+    return data.get("xp", 0) + data.get("voice_xp", 0)
+
 def has_required_role():
 
     async def predicate(interaction: discord.Interaction) -> bool:
@@ -398,7 +417,7 @@ async def give_voice_xp():
                     save_needed = True
 
                 # === XP + LEVEL-UP ===
-                user_data[user_id]["xp"] += 10
+                add_xp(user_id, 10, source="voice")
                 current_xp = user_data[user_id]["xp"]
                 current_level = user_data[user_id]["level"]
                 next_level_xp = xp_needed(current_level + 1)
@@ -615,7 +634,7 @@ async def on_message(message):
         return
 
     # XP normal
-    user_data[user_id]["xp"] += 5
+    add_xp(user_id, 5, source="text")
 
     if user_id not in monthly_data:
         monthly_data[user_id] = {"xp": 0}
