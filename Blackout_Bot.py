@@ -314,30 +314,41 @@ async def give_voice_xp():
             for member in vc.members:
                 if member.bot:
                     continue
-                if member.voice is None or member.voice.deaf or member.voice.self_deaf:
+
+                voice_state = member.voice
+                if not voice_state or voice_state.self_deaf or voice_state.deaf:
                     continue
 
                 user_id = str(member.id)
+
+                # Inițializare user_data dacă nu există
                 if user_id not in user_data:
                     user_data[user_id] = {"xp": 0, "level": 0, "rebirth": 0}
 
-                quest = quest_data.get(user_id)
-                if quest and isinstance(quest, dict) and quest.get("type") == "voice_minutes":
-                    if not quest.get("completed"):
-                        quest["progress"] = quest.get("progress", 0) + 1
-                        quest_data[user_id] = quest
-                        save_needed = True
+                # ===============================
+                # ===== QUEST VOICE_MINUTES =====
+                # ===============================
+                user_quests = quest_data.get(user_id, {})
+                active_quests = user_quests.get("active_quests", [])
 
+                for quest in active_quests:
+                    if quest.get("type") == "voice_minutes" and not quest.get("completed", False):
+                        quest["progress"] += 1
                         print(f"[VOICE QUEST] {member.display_name}: {quest['progress']}/{quest.get('target', 0)}")
 
                         if quest["progress"] >= quest.get("target", 0):
                             quest["completed"] = True
-                            quest_data[user_id] = quest
                             user_data[user_id]["xp"] += quest.get("reward", 0)
-                            save_needed = True
                             await finalize_quest(member, quest)
 
-                # XP pasiv pentru voice
+                        save_needed = True
+
+                user_quests["active_quests"] = active_quests
+                quest_data[user_id] = user_quests
+
+                # =========================
+                # ===== XP & LEVEL-UP =====
+                # =========================
                 user_data[user_id]["xp"] += 10
                 current_xp = user_data[user_id]["xp"]
                 current_level = user_data[user_id]["level"]
@@ -367,12 +378,13 @@ async def give_voice_xp():
                         except discord.Forbidden:
                             print(f"[EROARE] Nu pot da rol lui {member.display_name}")
                     elif channel and current_level != 1:
-                        await channel.send(f"{member.mention} a ajuns la nivelul {current_level}! 🎉")
+                        await channel.send(
+                            f"{member.mention} a ajuns la nivelul {current_level}! 🎉"
+                        )
 
         if save_needed:
             save_quest_data()
         save_user_data()
-
 
 # --- Eveniment on_ready ---
 
