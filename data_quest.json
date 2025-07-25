@@ -4,8 +4,8 @@
         "type": "voice_minutes",
         "target": 30,
         "reward": 200,
-        "progress": 0,
-        "completed": false
+        "progress": 30,
+        "completed": true
     },
     "1074388016182870117": {
         "quest": "Fii activ \u00een voice chat timp de 30 minute",
@@ -36,7 +36,7 @@
         "type": "voice_minutes",
         "target": 15,
         "reward": 120,
-        "progress": 0,
+        "progress": 3,
         "completed": false
     },
     "825368073388294145": {
