@@ -1013,31 +1013,33 @@ async def daily(interaction: discord.Interaction):
         print(f"[EROARE DAILY] {e}")
         await interaction.followup.send(f"❌ A apărut o eroare: `{e}`", ephemeral=True)
 
+from discord import app_commands
+from discord.ext.commands import has_role
+
 @app_commands.command(
     name="sent_anunt",
-    description="Trimite anunțul oficial de YouTube în canalul ales")
+    description="Trimite anunțul oficial despre leaderboard-ul lunar și comenzile BlackOut")
 @app_commands.describe(channel="Canalul în care vrei să trimiți anunțul")
-@has_required_role()
+@has_required_role()  # păstrează decoratorul tău custom
 async def sent_anunt(interaction: discord.Interaction,
                      channel: discord.TextChannel):
     embed = discord.Embed(
-        title="🎉 Lansare YouTube BlackOut RO!",
-        description=
-        ("Suntem aproape 100 de membri pe acest server, iar ca răsplată BlackOut RO lansează canalul nostru oficial de YouTube! 🔥\n\n"
-         "Vom juca jocuri împreună cu cei mai tari oameni din staff – și nu glumim:\n"
-         "🎮 @pyandrei, @blacky, @bondes, @danly, @mazare, @rias sunt deja confirmați!\n\n"
-         "Hai cu un subscribe aici și fii parte din vibe:\n👉 https://www.youtube.com/@blackout-ro\n\n"
-         "📝 Vrei și TU să apari pe canal?\n"
-         "Avem un formular deschis în #aplicatii-staff la secțiunea YouTube.\n"
-         "Intră, aplică și fă parte din echipă! 🚀\n\n"
-         "⚡ Powered by: BlackOut RO"),
-        color=discord.Color.red())
-
+        title="📢 Noutăți BlackOut RO: Leaderboard Lunar și Misiuni Zilnice!",
+        description=(
+            "Am lansat un **Leaderboard Lunar** unde poți câștiga roluri exclusive pentru activitatea ta lunară! 🏆\n\n"
+            "**Folosește comenzile disponibile pentru a fi mereu la curent și pentru a revendica recompense:**\n"
+            "✨ `/blackout daily` — revendică misiunea zilnică și câștigă XP bonus.\n"
+            "📋 `/blackout quest` — verifică progresul misiunilor tale curente.\n"
+            "🏅 `/blackout leaderboard_lunar` — vezi topul celor mai activi membri ai lunii.\n\n"
+            "Fii activ, completează misiuni și urcă în clasament pentru a primi roluri speciale! 🎉"
+        ),
+        color=discord.Color.blue()
+    )
     embed.set_footer(text="BlackOut RO")
-    embed.set_thumbnail(url=interaction.guild.icon.url if interaction.guild.
-                        icon else discord.Embed.Empty)
+    embed.set_thumbnail(url=interaction.guild.icon.url if interaction.guild.icon else discord.Embed.Empty)
 
     await channel.send(embed=embed)
+    await interaction.response.send_message(f"Anunțul a fost trimis în {channel.mention}", ephemeral=True)
 
 
 @blackout.command(name="rules",
