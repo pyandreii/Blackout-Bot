@@ -138,37 +138,36 @@ def has_required_role():
     return app_commands.check(predicate)
 
 
-async def finalize_quest(user: discord.User | discord.Member):
+async def finalize_quest(user, quest):
     try:
-        user_id = str(user.id)
-        quest = quest_data.get(user_id)
-        if not quest:
-            print(f"[finalize_quest] Nu am găsit quest pentru user {user_id}")
-            return
-        if user_id not in user_data:
-            print(f"[finalize_quest] Nu am găsit user_data pentru user {user_id}")
-            return
+        print(f"[DEBUG] finalize_quest apelat pentru user: {user} (ID: {user.id}), quest: {quest.get('type')}")
 
-        reward = int(quest.get("reward", 0))
-        user_data[user_id]["xp"] += reward
-
-        channel = bot.get_channel(text_channel_id)
-        if channel:
-            await channel.send(
-                f"🎉 {user.mention} ai finalizat misiunea și ai primit {reward} XP!"
-            )
-            print(f"[finalize_quest] Mesaj trimis pentru user {user.display_name}")
+        # Obține canalul unde trimitem mesajul (folosește guild din user dacă e Member, altfel ia din bot)
+        guild = getattr(user, "guild", None)
+        channel = None
+        if guild:
+            channel = guild.get_channel(text_channel_id)
         else:
-            print("[finalize_quest] Nu am găsit canalul pentru mesaje")
+            # fallback: încearcă să găsești canalul din bot (dacă ai o referință globală la bot și guild)
+            channel = bot.get_channel(text_channel_id)
 
-        quest["completed"] = True  # marchează finalizarea
-        quest_data[user_id] = quest
+        if not channel:
+            print(f"[WARN] Canalul cu ID {text_channel_id} nu a fost găsit.")
+            return
 
+        # Trimite mesajul de confirmare finalizare quest
+        await channel.send(
+            f"🎉 {user.mention} ai finalizat misiunea **{quest.get('type', 'necunoscută')}** și ai primit {quest.get('reward', 0)} XP!"
+        )
+
+        # Marchează quest-ul ca finalizat în date (poți face aici dacă nu e deja marcat)
+        quest["completed"] = True
+        quest_data[str(user.id)] = quest
         save_quest_data()
-        save_user_data()
-    except Exception as e:
-        print(f"[finalize_quest] Eroare: {e}")
 
+    except Exception as e:
+        print(f"[EROARE finalize_quest] {e}")
+        
 spam_limit_count = 3
 spam_limit_seconds = 5
 
@@ -729,7 +728,7 @@ async def level_up_check(message, user_id):
     save_quest_data()
 
     await bot.process_commands(message)
-    
+
 @bot.event
 async def on_reaction_add(reaction, user):
     if user.bot:
