@@ -1106,7 +1106,7 @@ async def leaderboard_lunar(interaction: discord.Interaction):
         return
 
     sorted_users = sorted(monthly_data.items(),
-                          key=lambda x: x[1].get("xp", 0),
+                          key=lambda x: x[1].get("xp", 0) + x[1].get("voice_xp", 0),
                           reverse=True)
 
     embed = discord.Embed(title="📅 Leaderboard Lunar",
@@ -1128,9 +1128,13 @@ async def leaderboard_lunar(interaction: discord.Interaction):
         if i == 1 and member and member.avatar:
             first_user = member
 
+        xp_text = data.get("xp", 0)
+        xp_voice = data.get("voice_xp", 0)
+        total_xp = xp_text + xp_voice
+
         embed.add_field(
             name=f"{i}. {name}",
-            value=f"✨ XP lunar: `{xp}`",
+            value=f"✨ XP lunar: `{total_xp}` (Text: `{xp_text}`, Voice: `{xp_voice}`)",
             inline=False
         )
 
