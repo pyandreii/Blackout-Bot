@@ -1020,7 +1020,7 @@ from discord.ext.commands import has_role
     name="sent_anunt",
     description="Trimite anunțul oficial despre leaderboard-ul lunar și comenzile BlackOut")
 @app_commands.describe(channel="Canalul în care vrei să trimiți anunțul")
-@has_required_role()  # păstrează decoratorul tău custom
+@has_required_role()  # Asigură-te că ai definit decoratorul corect sau înlocuiește cu @app_commands.check
 async def sent_anunt(interaction: discord.Interaction,
                      channel: discord.TextChannel):
     embed = discord.Embed(
@@ -1040,7 +1040,6 @@ async def sent_anunt(interaction: discord.Interaction,
 
     await channel.send(embed=embed)
     await interaction.response.send_message(f"Anunțul a fost trimis în {channel.mention}", ephemeral=True)
-
 
 @blackout.command(name="rules",
                   description="Afișează regulamentul oficial BlackOut RO")
