@@ -9,6 +9,7 @@ import asyncio
 from dotenv import load_dotenv
 import os
 import calendar
+import copy
 # --- Configurare ---
 
 ID_SERVER_PRINCIPAL = 1372682829074530335
@@ -151,6 +152,21 @@ def save_user_data():
     with open(data_file, "w") as f:
         json.dump(user_data, f, indent=4)
 
+def assign_daily_quest(user_id: str):
+    if user_id not in quest_data:
+        quest_data[user_id] = {}
+
+    # Selectează o misiune aleatorie
+    quest = copy.deepcopy(random.choice(DAILY_QUESTS))
+
+    # Inițializează progresul și starea
+    quest.setdefault("progress", 0)
+    quest.setdefault("completed", False)
+
+    # Salvează în quest_data
+    quest_data[user_id] = quest
+
+    save_quest_data()
 
 def has_required_role():
 
@@ -167,30 +183,45 @@ def has_required_role():
 
 async def finalize_quest(user, quest):
     try:
+        if quest.get("completed", False):
+            print(f"[INFO] Quest-ul este deja completat pentru userul {user.id}. Nu acord XP din nou.")
+            return
+
         print(f"[DEBUG] finalize_quest apelat pentru user: {user} (ID: {user.id}), quest: {quest.get('type')}")
 
-        # Obține canalul unde trimitem mesajul (folosește guild din user dacă e Member, altfel ia din bot)
         guild = getattr(user, "guild", None)
         channel = None
         if guild:
             channel = guild.get_channel(text_channel_id)
         else:
-            # fallback: încearcă să găsești canalul din bot (dacă ai o referință globală la bot și guild)
             channel = bot.get_channel(text_channel_id)
 
         if not channel:
             print(f"[WARN] Canalul cu ID {text_channel_id} nu a fost găsit.")
             return
 
-        # Trimite mesajul de confirmare finalizare quest
+        # ✅ Acordă XP o singură dată
+        user_id_str = str(user.id)
+        if user_id_str in user_data:
+            user_data[user_id_str]["xp"] += quest.get("reward", 0)
+        else:
+            user_data[user_id_str] = {
+                "xp": quest.get("reward", 0),
+                "level": 0,
+                "rebirth": 0
+            }
+
+        quest["completed"] = True
+        quest_data[user_id_str] = quest
+
+        # Salvări
+        save_user_data()
+        save_quest_data()
+
+        # ✅ Trimite mesaj pe canal
         await channel.send(
             f"🎉 {user.mention} ai finalizat misiunea **{quest.get('type', 'necunoscută')}** și ai primit {quest.get('reward', 0)} XP!"
         )
-
-        # Marchează quest-ul ca finalizat în date (poți face aici dacă nu e deja marcat)
-        quest["completed"] = True
-        quest_data[str(user.id)] = quest
-        save_quest_data()
 
     except Exception as e:
         print(f"[EROARE finalize_quest] {e}")
@@ -348,34 +379,25 @@ async def give_voice_xp():
 
                 user_id = str(member.id)
 
-                # Inițializare user_data dacă nu există
+                # Inițializare user_data
                 if user_id not in user_data:
                     user_data[user_id] = {"xp": 0, "level": 0, "rebirth": 0}
 
-                # ===============================
-                # ===== QUEST VOICE_MINUTES =====
-                # ===============================
-                user_quests = quest_data.get(user_id, {})
-                active_quests = user_quests.get("active_quests", [])
+                # === QUEST: voice_minutes ===
+                quest = quest_data.get(user_id)
+                if quest and quest.get("type") == "voice_minutes" and not quest.get("completed", False):
+                    quest["progress"] += 1
+                    print(f"[VOICE QUEST] {member.display_name}: {quest['progress']}/{quest.get('target', 0)}")
 
-                for quest in active_quests:
-                    if quest.get("type") == "voice_minutes" and not quest.get("completed", False):
-                        quest["progress"] += 1
-                        print(f"[VOICE QUEST] {member.display_name}: {quest['progress']}/{quest.get('target', 0)}")
+                    if quest["progress"] >= quest.get("target", 0):
+                        quest["completed"] = True
+                        user_data[user_id]["xp"] += quest.get("reward", 0)
+                        await finalize_quest(member, quest)
 
-                        if quest["progress"] >= quest.get("target", 0):
-                            quest["completed"] = True
-                            user_data[user_id]["xp"] += quest.get("reward", 0)
-                            await finalize_quest(member, quest)
+                    quest_data[user_id] = quest
+                    save_needed = True
 
-                        save_needed = True
-
-                user_quests["active_quests"] = active_quests
-                quest_data[user_id] = user_quests
-
-                # =========================
-                # ===== XP & LEVEL-UP =====
-                # =========================
+                # === XP + LEVEL-UP ===
                 user_data[user_id]["xp"] += 10
                 current_xp = user_data[user_id]["xp"]
                 current_level = user_data[user_id]["level"]
@@ -557,30 +579,23 @@ async def get_inviter(member):
 
 @bot.event
 async def on_message(message):
-    if message.author.bot:
-        return
-    if not message.guild:
+    if message.author.bot or not message.guild:
         return
 
     user_id = str(message.author.id)
     now = datetime.now(timezone.utc)
 
-    # Inițializează user_data dacă nu există
+    # Inițializare user_data
     if user_id not in user_data:
         user_data[user_id] = {"xp": 0, "level": 0, "rebirth": 0}
 
-    # Inițializează coada de mesaje recente pentru anti-spam
-    if user_id not in user_recent_messages:
-        user_recent_messages[user_id] = deque()
-
+    # Anti-spam
     recent = user_recent_messages[user_id]
     recent.append(message)
 
-    # Curăță mesaje vechi (> spam_limit_seconds)
     while recent and (now - recent[0].created_at).total_seconds() > spam_limit_seconds:
         recent.popleft()
 
-    # Detectare spam
     if len(recent) > spam_limit_count:
         try:
             for msg in list(recent):
@@ -597,9 +612,9 @@ async def on_message(message):
             await warn_msg.delete(delay=5)
         except Exception as e:
             print(f"[Eroare spam] {e}")
-        return  # Nu mai procesăm dacă e spam
+        return
 
-    # --- ADĂUGĂ XP NORMAL IMEDIAT după anti-spam ---
+    # XP normal
     user_data[user_id]["xp"] += 5
 
     if user_id not in monthly_data:
@@ -607,108 +622,51 @@ async def on_message(message):
     monthly_data[user_id]["xp"] += 10
     save_monthly_data()
 
-    # Quest progres
+    # === Quest Update ===
     quest = quest_data.get(user_id)
-    if not quest:
-        # Dacă nu are quest, procesăm nivelarea și ieșim
-        await level_up_check(message, user_id)
-        return
+    if quest and not quest.get("completed", False):
+        qtype = quest.get("type")
 
-    # 1. Questuri tip "text_messages" sau "messages"
-    if quest.get("type") in ["text_messages", "messages"] and quest.get("progress", 0) < quest.get("target", 0):
-        if not quest.get("completed"):
+        if qtype in ["messages", "text_messages"]:
             quest["progress"] += 1
-            target = quest.get("target", 0)
 
-            if quest["progress"] >= target:
-                quest["completed"] = True
-                user_data[user_id]["xp"] += quest.get("reward", 0)
-                save_user_data()
-                save_quest_data()
-                await finalize_quest(message.author, quest)
-            else:
-                quest_data[user_id] = quest
-                save_quest_data()
-
-    # 2. mention_friend
-    elif quest.get("type") == "mention_friend" and quest.get("progress", 0) < quest.get("target", 0):
-        if not quest.get("completed"):
+        elif qtype == "mention_friend":
             if message.mentions and any(m.id != message.author.id for m in message.mentions):
                 quest["progress"] += 1
-                target = quest.get("target", 0)
 
-                if quest["progress"] >= target:
-                    quest["completed"] = True
-                    user_data[user_id]["xp"] += quest.get("reward", 0)
-                    save_user_data()
-                    save_quest_data()
-                    await finalize_quest(message.author, quest)
-                else:
-                    quest_data[user_id] = quest
-                    save_quest_data()
-
-    # 3. reply
-    elif quest.get("type") == "reply" and quest.get("progress", 0) < quest.get("target", 0):
-        if not quest.get("completed"):
+        elif qtype == "reply":
             if message.reference and message.reference.message_id:
                 try:
                     ref_msg = await message.channel.fetch_message(message.reference.message_id)
                     if ref_msg.author.id != message.author.id:
                         quest["progress"] += 1
-                        target = quest.get("target", 0)
-
-                        if quest["progress"] >= target:
-                            quest["completed"] = True
-                            user_data[user_id]["xp"] += quest.get("reward", 0)
-                            save_user_data()
-                            save_quest_data()
-                            await finalize_quest(message.author, quest)
-                        else:
-                            quest_data[user_id] = quest
-                            save_quest_data()
                 except discord.NotFound:
                     pass
 
-    # 4. bump_server
-    elif quest.get("type") == "bump_server" and quest.get("progress", 0) < quest.get("target", 0):
-        if not quest.get("completed"):
+        elif qtype == "bump_server":
             if (
-                message.channel.id == BUMP_CHANNEL_ID and
-                message.author.id == DISBOARD_ID and
-                message.embeds
+                message.channel.id == BUMP_CHANNEL_ID
+                and message.author.id == DISBOARD_ID
+                and message.embeds
             ):
                 embed = message.embeds[0]
-                bumped_by_text = embed.footer.text if embed.footer else None
+                footer = embed.footer.text if embed.footer else ""
+                if "Bumped by" in footer:
+                    bumped_name = footer.replace("Bumped by ", "").strip()
+                    if str(message.author) == bumped_name:
+                        quest["progress"] += 1
 
-                if bumped_by_text and "Bumped by" in bumped_by_text:
-                    username = bumped_by_text.replace("Bumped by ", "").strip()
-                    bumped_user = discord.utils.find(
-                        lambda m: str(m) == username,
-                        message.guild.members
-                    )
+        # Finalizare dacă e complet
+        if quest["progress"] >= quest.get("target", 0):
+            quest["completed"] = True
+            user_data[user_id]["xp"] += quest.get("reward", 0)
+            await finalize_quest(message.author, quest)
 
-                    if bumped_user:
-                        bumped_user_id = str(bumped_user.id)
-                        # Securitate: nu acorda progres daca bump-ul este facut de botul însuși
-                        if bumped_user.bot:
-                            return
+        # Salvează progresul
+        quest_data[user_id] = quest
+        save_quest_data()
 
-                        bumped_quest = quest_data.get(bumped_user_id)
-                        if bumped_quest and bumped_quest.get("type") == "bump_server" and not bumped_quest.get("completed"):
-                            bumped_quest["progress"] = bumped_quest.get("progress", 0) + 1
-                            target = bumped_quest.get("target", 0)
-
-                            if bumped_quest["progress"] >= target:
-                                bumped_quest["completed"] = True
-                                user_data[bumped_user_id]["xp"] += bumped_quest.get("reward", 0)
-                                save_user_data()
-                                save_quest_data()
-                                await finalize_quest(bumped_user, bumped_quest)
-                            else:
-                                quest_data[bumped_user_id] = bumped_quest
-                                save_quest_data()
-
-    # Verifică nivelarea user-ului apelând funcție dedicată
+    # Verificare level up
     await level_up_check(message, user_id)
 
 
@@ -865,16 +823,6 @@ class RebirthConfirmView(discord.ui.View):
         await interaction.response.edit_message(content="Rebirth anulat.", view=None)
         self.value = False
         self.stop()
-
-@bot.tree.error
-async def on_app_command_error(interaction: discord.Interaction, error):
-    try:
-        if interaction.response.is_done():
-            await interaction.followup.send("❌ A apărut o eroare la executarea comenzii.", ephemeral=True)
-        else:
-            await interaction.response.send_message("❌ A apărut o eroare la executarea comenzii.", ephemeral=True)
-    except Exception as e:
-        print(f"Error in error handler: {e}")
 
 
 @bot.tree.error
