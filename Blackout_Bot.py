@@ -574,13 +574,19 @@ async def on_raw_reaction_add(payload):
     user_id = str(payload.user_id)
     quest = quest_data.get(user_id)
 
-    if quest and quest.get("type") == "reactions":
-        quest["progress"] = quest.get("progress", 0) + 1
+    if quest and quest.get("type") == "reactions" and not quest.get("completed", False):
+        quest["progress"] += 1
+        target = quest.get("target", 0)
 
-        if quest["progress"] >= quest["target"]:
-            member = await bot.fetch_user(payload.user_id)
-            await finalize_quest(member)
-            quest_data[user_id] = {}
+        if quest["progress"] >= target:
+            quest["completed"] = True
+            user_data[user_id]["xp"] += quest.get("reward", 0)
+            save_user_data()
+            await finalize_quest(await bot.fetch_user(payload.user_id), quest)
+        else:
+            print(f"[REACTION QUEST] {payload.user_id} progres: {quest['progress']}/{target}")
+
+        quest_data[user_id] = quest
         save_quest_data()
 
 async def get_inviter(member):
@@ -604,88 +610,68 @@ async def on_message(message):
     user_id = str(message.author.id)
     now = datetime.now(timezone.utc)
 
-    # Inițializare user_data
-    if user_id not in user_data:
-        user_data[user_id] = {"xp": 0, "level": 0, "rebirth": 0}
+    # === XP & Anti-Spam ===
+    user_recent_messages[user_id].append(message)
+    while user_recent_messages[user_id] and (now - user_recent_messages[user_id][0].created_at).total_seconds() > spam_limit_seconds:
+        user_recent_messages[user_id].popleft()
 
-    # Anti-spam
-    recent = user_recent_messages[user_id]
-    recent.append(message)
-
-    while recent and (now - recent[0].created_at).total_seconds() > spam_limit_seconds:
-        recent.popleft()
-
-    if len(recent) > spam_limit_count:
+    if len(user_recent_messages[user_id]) > spam_limit_count:
         try:
-            for msg in list(recent):
+            for msg in list(user_recent_messages[user_id]):
                 try:
                     await msg.delete()
                 except:
                     pass
-            recent.clear()
-            warn_msg = await message.channel.send(
-                f"{message.author.mention}, nu spamma, te rog! Vei fi mutat temporar."
-            )
-            if isinstance(message.author, discord.Member):
-                await message.author.timeout(timedelta(seconds=30), reason="Spam detectat")
+            user_recent_messages[user_id].clear()
+            warn_msg = await message.channel.send(f"{message.author.mention}, nu spamma, te rog! Vei fi mutat temporar.")
+            await message.author.timeout(timedelta(seconds=30), reason="Spam detectat")
             await warn_msg.delete(delay=5)
         except Exception as e:
             print(f"[Eroare spam] {e}")
         return
 
-    # XP normal
+    # === XP normal ===
     add_xp(user_id, 5, source="text")
-
-    if user_id not in monthly_data:
-        monthly_data[user_id] = {"xp": 0}
+    monthly_data.setdefault(user_id, {"xp": 0, "voice_xp": 0})
     monthly_data[user_id]["xp"] += 10
     save_monthly_data()
 
-    # === Quest Update ===
+    # === Questuri ===
     quest = quest_data.get(user_id)
     if quest and not quest.get("completed", False):
         qtype = quest.get("type")
 
-        if qtype in ["messages", "text_messages"]:
+        if qtype == "messages":
             quest["progress"] += 1
 
         elif qtype == "mention_friend":
             if message.mentions and any(m.id != message.author.id for m in message.mentions):
                 quest["progress"] += 1
 
-
         elif qtype == "reply":
             if message.reference:
                 quest["progress"] += 1
 
+    # === BUMP ===
+    if message.channel.id == BUMP_CHANNEL_ID and message.content.lower().startswith("!d bump"):
+        if quest and quest.get("type") == "bump_server" and not quest.get("completed", False):
+            quest["progress"] += 1
 
-        elif qtype == "reply":
+    # === Finalizare quest dacă e complet ===
+    if quest and quest["progress"] >= quest.get("target", 0) and not quest.get("completed", False):
+        quest["completed"] = True
+        user_data[user_id]["xp"] += quest.get("reward", 0)
+        await finalize_quest(message.author, quest)
 
-            if message.reference:
-                quest["progress"] += 1
-
-
-        elif qtype == "bump_server":
-            if (
-                    message.channel.id == BUMP_CHANNEL_ID
-                    and message.author.id == DISBOARD_ID
-                    and message.embeds
-
-            ):
-                quest["progress"] += 1
-
-        # Finalizare dacă e complet
-        if quest["progress"] >= quest.get("target", 0):
-            quest["completed"] = True
-            user_data[user_id]["xp"] += quest.get("reward", 0)
-            await finalize_quest(message.author, quest)
-
-        # Salvează progresul
+    # Salvare
+    if quest:
         quest_data[user_id] = quest
         save_quest_data()
+    save_user_data()
 
-    # Verificare level up
+    # Level up check
     await level_up_check(message, user_id)
+    await bot.process_commands(message)
 
 
 async def level_up_check(message, user_id):
@@ -752,30 +738,6 @@ async def level_up_check(message, user_id):
 
     await bot.process_commands(message)
 
-@bot.event
-async def on_reaction_add(reaction, user):
-    if user.bot:
-        return
-
-    user_id = str(user.id)
-    quest = quest_data.get(user_id)
-
-    if quest and isinstance(quest, dict) and quest.get("type") == "reactions":
-        if quest.get("completed"):
-            return
-
-        quest["progress"] += 1
-        target = quest.get("target", 0)
-
-        if quest["progress"] >= target:
-            quest["completed"] = True
-            user_data[user_id]["xp"] += quest["reward"]
-            save_user_data()
-            save_quest_data()
-            await finalize_quest(user, quest)
-        else:
-            save_quest_data()
-            print(f"[REACTION QUEST] {user.display_name} progres: {quest['progress']}/{target}")
 
 @blackout.command(name="rank", description="Vezi nivelul și XP-ul unui membru")
 @app_commands.describe(member="Membrul căruia vrei să-i vezi rankul")
