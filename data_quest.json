@@ -1,1 +1,18 @@
-{ }
+{
+    "711202139434647642": {
+        "quest": "Reac\u021bioneaz\u0103 la 5 mesaje ale altor membri",
+        "type": "reactions",
+        "target": 5,
+        "reward": 70,
+        "progress": 5,
+        "completed": true
+    },
+    "1094241583932657666": {
+        "quest": "Stai 15 minute \u00een voice chat",
+        "type": "voice_minutes",
+        "target": 15,
+        "reward": 120,
+        "progress": 15,
+        "completed": true
+    }
+}
