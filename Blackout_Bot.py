@@ -5,10 +5,8 @@ from datetime import datetime, timedelta, timezone
 import random
 from discord import app_commands
 import discord
-import asyncio
 from dotenv import load_dotenv
 import os
-import calendar
 import copy
 # --- Configurare ---
 
@@ -18,6 +16,7 @@ CO_OWNER_ROLE_ID = 1397521192092700702
 REQUIRED_ROLE_ID = 1397521192092700702
 BUMP_CHANNEL_ID = 1390006025532211310
 DISBOARD_ID = 302050872383242240
+WELCOME_CHANNEL_ID = 1389567710693953606
 
 role_nivele = {
     1: 1390238119734935673,
@@ -494,35 +493,52 @@ async def cache_invites(guild):
         invite_cache[guild.id] = []
 
 
-async def on_member_join(member):
+@bot.event
+async def on_member_join(member: discord.Member):
+    guild = member.guild
+
+    # ========================
+    # 🎯 INVITE TRACKING
+    # ========================
     inviter = await get_inviter(member)
-    if not inviter:
-        return
+    if inviter:
+        user_id = str(inviter.id)
+        quest = quest_data.get(user_id)
 
-    user_id = str(inviter.id)
-    user_quests = quest_data.get(user_id)
+        if quest and quest.get("type") == "invite_friend" and not quest.get("completed", False):
+            quest["progress"] += 1
+            if quest["progress"] >= quest.get("target", 1):
+                await finalize_quest(inviter, quest)
 
-    if not user_quests:
-        return
+            quest_data[user_id] = quest
+            save_quest_data()
 
-    active_quests = user_quests.get("active_quests", [])
+        # 🔁 actualizează cache-ul de invitații
+        try:
+            invite_cache[guild.id] = await guild.invites()
+        except discord.Forbidden:
+            invite_cache[guild.id] = []
 
-    for quest in active_quests:
-        if quest.get("type") == "invite_friend" and not quest.get("completed", False):
-            if quest.get("progress", 0) < quest.get("target", 0):
-                quest["progress"] += 1
+    # ========================
+    # 👋 WELCOME MESSAGE
+    # ========================
+    welcome_channel = guild.get_channel(WELCOME_CHANNEL_ID)
+    if welcome_channel:
+        embed = discord.Embed(
+            title=f"👋 Bun venit pe {guild.name}!",
+            description=f"{member.mention}, ne bucurăm că ești aici! 🎉",
+            color=discord.Color.green()
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.add_field(name="🆔 Nume", value=member.name, inline=True)
+        embed.add_field(name="📆 Cont creat", value=f"<t:{int(member.created_at.timestamp())}:D>", inline=True)
+        embed.set_footer(text="BlackOut RO • Welcome System")
+        embed.timestamp = datetime.now(timezone.utc)
 
-                if quest["progress"] >= quest["target"]:
-                    save_user_data()
-                    await finalize_quest(inviter, quest)
-
-                # Nu ai nevoie de `else` aici, doar salvezi quest-urile
-                save_quest_data()
-
-    # Salvează actualizările înapoi în `quest_data`
-    quest_data[user_id]["active_quests"] = active_quests
-    save_quest_data()
-
+        try:
+            await welcome_channel.send(embed=embed)
+        except Exception as e:
+            print(f"[EROARE welcome embed] {e}")
 
 @bot.event
 async def on_ready():
@@ -664,6 +680,7 @@ async def on_message(message):
     # Level up check
     await level_up_check(message, user_id)
     await bot.process_commands(message)
+
 
 
 async def level_up_check(message, user_id):
