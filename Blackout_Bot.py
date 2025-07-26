@@ -409,8 +409,6 @@ async def give_voice_xp():
                     print(f"[VOICE QUEST] {member.display_name}: {quest['progress']}/{quest.get('target', 0)}")
 
                     if quest["progress"] >= quest.get("target", 0):
-                        quest["completed"] = True
-                        user_data[user_id]["xp"] += quest.get("reward", 0)
                         await finalize_quest(member, quest)
 
                     quest_data[user_id] = quest
@@ -515,8 +513,6 @@ async def on_member_join(member):
                 quest["progress"] += 1
 
                 if quest["progress"] >= quest["target"]:
-                    quest["completed"] = True
-                    user_data[user_id]["xp"] += quest.get("reward", 0)
                     save_user_data()
                     await finalize_quest(inviter, quest)
 
@@ -579,8 +575,6 @@ async def on_raw_reaction_add(payload):
         target = quest.get("target", 0)
 
         if quest["progress"] >= target:
-            quest["completed"] = True
-            user_data[user_id]["xp"] += quest.get("reward", 0)
             save_user_data()
             await finalize_quest(await bot.fetch_user(payload.user_id), quest)
         else:
@@ -659,8 +653,6 @@ async def on_message(message):
 
     # === Finalizare quest dacă e complet ===
     if quest and quest["progress"] >= quest.get("target", 0) and not quest.get("completed", False):
-        quest["completed"] = True
-        user_data[user_id]["xp"] += quest.get("reward", 0)
         await finalize_quest(message.author, quest)
 
     # Salvare
@@ -929,7 +921,7 @@ async def sent(interaction: discord.Interaction, channel: discord.TextChannel,
 
 @blackout.command(name="daily", description="Primește o misiune zilnică aleatorie")
 async def daily(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)  # ✅ Confirmăm interacțiunea
+    await interaction.response.defer(ephemeral=True)
 
     try:
         user_id = str(interaction.user.id)
@@ -941,7 +933,8 @@ async def daily(interaction: discord.Interaction):
         last_claim_str = user_data[user_id].get("last_daily", "2000-01-01")
         last_claim = datetime.strptime(last_claim_str, "%Y-%m-%d").date()
 
-        if today > last_claim or not quest_data.get(user_id) or quest_data[user_id].get("completed", True):
+        # ✅ Dă quest nou doar dacă a trecut ziua
+        if today > last_claim:
             quest = generate_daily_quest()
             user_data[user_id]["last_daily"] = str(today)
 
@@ -962,18 +955,29 @@ async def daily(interaction: discord.Interaction):
                 f"🎁 Recompensă: `{quest['reward']} XP`\n"
                 f"📈 Progres: `0 / {quest['target']}`\nSucces!"
             )
+
         else:
+            # ✅ Arată progresul dacă deja are un quest azi
             current_quest = quest_data.get(user_id)
             if current_quest:
+                progres = current_quest.get("progress", 0)
+                target = current_quest.get("target", 1)
+                bar_length = 20
+                filled = int(bar_length * progres / target)
+                bar = "█" * filled + "░" * (bar_length - filled)
+
                 await interaction.followup.send(
                     f"⏳ Ai deja o misiune zilnică activă:\n"
                     f"📌 **{current_quest['quest']}**\n"
-                    f"Progres: `{current_quest.get('progress', 0)} / {current_quest.get('target', 0)}`\n"
-                    "Revino mâine pentru o nouă misiune!"
+                    f"📈 Progres: `{progres} / {target}`\n"
+                    f"[{bar}]\n"
+                    f"🎁 Recompensă: **{current_quest['reward']} XP**\n"
+                    f"🔁 Revino mâine pentru o nouă misiune!"
                 )
             else:
                 await interaction.followup.send(
-                    "⏳ Ai revendicat deja o misiune azi. Revino mâine!"
+                    "⚠️ Ai folosit comanda, dar nu există nicio misiune activă. Raportează asta unui admin.",
+                    ephemeral=True
                 )
 
     except Exception as e:
