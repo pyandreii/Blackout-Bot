@@ -8,6 +8,9 @@ import discord
 from dotenv import load_dotenv
 import os
 import copy
+from PIL import Image, ImageDraw, ImageFont
+import aiohttp
+import io
 # --- Configurare ---
 
 ID_SERVER_PRINCIPAL = 1372682829074530335
@@ -492,6 +495,7 @@ async def cache_invites(guild):
         print(f"❌ Botul nu are permisiuni pentru `guild.invites()` în: {guild.name} ({guild.id})")
         invite_cache[guild.id] = []
 
+font = ImageFont.truetype("D:/disk E/.venv/Blackout/Font/arial.ttf", 40)
 
 @bot.event
 async def on_member_join(member: discord.Member):
@@ -539,6 +543,49 @@ async def on_member_join(member: discord.Member):
             await welcome_channel.send(embed=embed)
         except Exception as e:
             print(f"[EROARE welcome embed] {e}")
+
+            # ========================
+            # 🖼️ Imagine de welcome
+            # ========================
+            try:
+                avatar_url = member.display_avatar.replace(format="png", size=128).url
+
+                # ✅ Descarcă avatarul userului
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(avatar_url) as resp:
+                        if resp.status != 200:
+                            raise Exception("Nu am putut descărca avatarul.")
+                        avatar_bytes = await resp.read()
+
+                avatar_img = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
+                avatar_img = avatar_img.resize((128, 128))
+
+                # ✅ Creează banner simplu (800x250)
+                bg = Image.new("RGBA", (800, 250), (30, 30, 30, 255))
+                draw = ImageDraw.Draw(bg)
+
+                # ✅ Încarcă font (folosește unul local sau system)
+                try:
+                    font = ImageFont.truetype("arial.ttf", 40)
+                except:
+                    font = ImageFont.load_default()
+
+                # ✅ Scrie text pe imagine
+                text = f"Bun venit, {member.name}!"
+                draw.text((180, 90), text, font=font, fill=(255, 255, 255, 255))
+
+                # ✅ Adaugă avatar pe imagine
+                bg.paste(avatar_img, (30, 60), avatar_img)
+
+                # ✅ Salvează temporar
+                path = f"/tmp/welcome_{member.id}.png"
+                bg.save(path)
+
+                # ✅ Trimite imagine în canal
+                await welcome_channel.send(file=discord.File(path))
+
+            except Exception as e:
+                print(f"[EROARE WELCOME IMAGE] {e}")
 
 @bot.event
 async def on_ready():
