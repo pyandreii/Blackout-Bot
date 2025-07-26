@@ -495,7 +495,7 @@ async def cache_invites(guild):
         print(f"❌ Botul nu are permisiuni pentru `guild.invites()` în: {guild.name} ({guild.id})")
         invite_cache[guild.id] = []
 
-font = ImageFont.truetype("D:/disk E/.venv/Blackout/Font/arial.ttf", 40)
+font = ImageFont.truetype("Font/arial.ttf", 40)
 
 @bot.event
 async def on_member_join(member: discord.Member):
