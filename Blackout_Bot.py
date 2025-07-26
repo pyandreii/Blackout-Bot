@@ -182,7 +182,7 @@ def add_xp(user_id: str, amount: int, source: str = "text"):
 
     save_user_data()
     save_monthly_data()
-    
+
 def get_total_monthly_xp(user_id: str) -> int:
     data = monthly_data.get(user_id, {})
     return data.get("xp", 0) + data.get("voice_xp", 0)
@@ -653,27 +653,26 @@ async def on_message(message):
             if message.mentions and any(m.id != message.author.id for m in message.mentions):
                 quest["progress"] += 1
 
+
         elif qtype == "reply":
-            if message.reference and message.reference.message_id:
-                try:
-                    ref_msg = await message.channel.fetch_message(message.reference.message_id)
-                    if ref_msg.author.id != message.author.id:
-                        quest["progress"] += 1
-                except discord.NotFound:
-                    pass
+            if message.reference:
+                quest["progress"] += 1
+
+
+        elif qtype == "reply":
+
+            if message.reference:
+                quest["progress"] += 1
+
 
         elif qtype == "bump_server":
             if (
-                message.channel.id == BUMP_CHANNEL_ID
-                and message.author.id == DISBOARD_ID
-                and message.embeds
+                    message.channel.id == BUMP_CHANNEL_ID
+                    and message.author.id == DISBOARD_ID
+                    and message.embeds
+
             ):
-                embed = message.embeds[0]
-                footer = embed.footer.text if embed.footer else ""
-                if "Bumped by" in footer:
-                    bumped_name = footer.replace("Bumped by ", "").strip()
-                    if str(message.author) == bumped_name:
-                        quest["progress"] += 1
+                quest["progress"] += 1
 
         # Finalizare dacă e complet
         if quest["progress"] >= quest.get("target", 0):
