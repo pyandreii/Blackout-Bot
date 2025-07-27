@@ -20,6 +20,7 @@ REQUIRED_ROLE_ID = 1397521192092700702
 BUMP_CHANNEL_ID = 1390006025532211310
 DISBOARD_ID = 302050872383242240
 WELCOME_CHANNEL_ID = 1389567710693953606
+GOODBYE_CHANNEL_ID = 123456789012345678
 
 role_nivele = {
     1: 1390238119734935673,
@@ -586,6 +587,28 @@ async def on_member_join(member: discord.Member):
 
             except Exception as e:
                 print(f"[EROARE WELCOME IMAGE] {e}")
+
+@bot.event
+async def on_member_remove(member: discord.Member):
+    guild = member.guild
+    goodbye_channel = guild.get_channel(GOODBYE_CHANNEL_ID)
+
+    if goodbye_channel:
+        embed = discord.Embed(
+            title="👋 Un membru a părăsit serverul...",
+            description=f"{member.mention} ne-a părăsit. Sper să revii pe server. 😢",
+            color=discord.Color.red()
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.add_field(name="Nume", value=member.name, inline=True)
+        embed.add_field(name="Cont creat", value=f"<t:{int(member.created_at.timestamp())}:D>", inline=True)
+        embed.set_footer(text="BlackOut RO • Goodbye System")
+        embed.timestamp = datetime.now(timezone.utc)
+
+        try:
+            await goodbye_channel.send(embed=embed)
+        except Exception as e:
+            print(f"[EROARE goodbye embed] {e}")
 
 @bot.event
 async def on_ready():
