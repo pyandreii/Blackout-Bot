@@ -20,7 +20,7 @@ REQUIRED_ROLE_ID = 1397521192092700702
 BUMP_CHANNEL_ID = 1390006025532211310
 DISBOARD_ID = 302050872383242240
 WELCOME_CHANNEL_ID = 1389567710693953606
-GOODBYE_CHANNEL_ID = 1389614232948965447
+GOODBYE_CHANNEL_ID = 123456789012345678
 
 role_nivele = {
     1: 1390238119734935673,
@@ -909,9 +909,11 @@ async def blackout_leaderboard(interaction: discord.Interaction):
                           key=lambda x: (x[1]['level'], x[1]['xp']),
                           reverse=True)
 
-    embed = discord.Embed(title="🏆 Blackout Leaderboard",
-                          description="Top 10 utilizatori după nivel și XP",
-                          color=discord.Color.dark_gold())
+    embed = discord.Embed(
+        title="🏆 Clasament Global — Top XP",
+        description="Cei mai activi membri de pe server:",
+        color=discord.Color.gold()
+    )
 
     first_user = None
     for i, (user_id, data) in enumerate(sorted_users[:10], start=1):
@@ -926,23 +928,39 @@ async def blackout_leaderboard(interaction: discord.Interaction):
         level = data.get("level", 0)
         xp = data.get("xp", 0)
         rebirth = data.get("rebirth", 0)
-        rebirth_display = f" 🔁x{rebirth}" if rebirth > 0 else ""
 
         if member:
             await update_rebirth_role(member, rebirth)
 
-        if i == 1 and member and member.avatar:
-            first_user = member
+        # 🏅 Emoji-uri pentru top 3
+        if i == 1:
+            medal = "🥇"
+            if member and member.avatar:
+                first_user = member
+        elif i == 2:
+            medal = "🥈"
+        elif i == 3:
+            medal = "🥉"
+        else:
+            medal = f"`#{i}`"
 
-        embed.add_field(
-            name=f"{i}. {name}",
-            value=f"⭐ Nivel: `{level}` • ✨ XP: `{xp}`{rebirth_display}",
-            inline=False)
+        # 🔁 Afisare rebirth doar dacă există
+        rebirth_display = f"• 🔁 `{rebirth}`" if rebirth > 0 else ""
 
+        # 🧾 Conținutul fiecărei linii
+        value = (
+            f"🧱 Nivel: `{level}`\n"
+            f"✨ XP: `{xp}`\n"
+            f"{rebirth_display}"
+        )
+
+        embed.add_field(name=f"{medal} {name}", value=value.strip(), inline=False)
+
+    # 🖼️ Avatar top 1 ca thumbnail
     if first_user and first_user.avatar:
         embed.set_thumbnail(url=first_user.avatar.url)
 
-    embed.set_footer(text="🔢 Clasament actualizat")
+    embed.set_footer(text="📊 Clasament actualizat live • BlackOut RO")
     embed.timestamp = datetime.now(timezone.utc)
 
     await interaction.response.send_message(embed=embed)
@@ -1363,25 +1381,48 @@ async def profile(interaction: discord.Interaction,
     # 🔥 Emoji vizual rebirth
     rebirth_display = f"🔥 x{rebirth}" if rebirth > 0 else "—"
 
-    embed = discord.Embed(title=f"🎮 Profil — {user.display_name}",
-                          description=f"🆔 `{user.id}`",
-                          color=discord.Color.purple())
+    sorted_users = sorted(
+        data_file.items(),
+        key=lambda x: (x[1].get("rebirth", 0), x[1].get("xp", 0)),
+        reverse=True
+    )
+
+    position = next((i for i, (uid, _) in enumerate(sorted_users, start=1) if str(uid) == str(user.id)), None)
+    total_users = len(sorted_users)
+
+    embed = discord.Embed(
+        title=f"🧑‍🚀 Profilul lui {user.display_name}",
+        description=f"🆔 `{user.id}`",
+        color=discord.Color.from_str("#9c88ff")  # violet deschis
+    )
 
     embed.set_thumbnail(url=user.display_avatar.url)
 
-    embed.add_field(name="🧱 Nivel", value=f"`{level}`", inline=True)
-    embed.add_field(name="💥 XP",
-                    value=f"`{xp} / {next_level_xp}`",
-                    inline=True)
-    embed.add_field(name="🔁 Rebirth",
-                    value=f"`{rebirth_display}`",
-                    inline=True)
+    embed.add_field(
+        name="🏅 Nivel & XP",
+        value=f"**{level}**  •  `{xp} / {next_level_xp}` XP",
+        inline=False
+    )
 
-    embed.add_field(name="📊 Progres către nivelul următor",
-                    value=f"{progress_bar} `{progress_percent}%`",
-                    inline=False)
+    embed.add_field(
+        name="🔁 Rebirth",
+        value=f"`{rebirth}` {rebirth_display}",
+        inline=True
+    )
 
-    embed.set_footer(text="Sistemul de leveling Blackout")
+    embed.add_field(
+        name="📈 Progres",
+        value=f"{progress_bar} `{progress_percent}%`",
+        inline=True
+    )
+
+    embed.add_field(
+        name="📈 Poziție în clasament",
+        value=f"`#{position}` din `{total_users}` utilizatori",
+        inline=False
+    )
+
+    embed.set_footer(text="⚡ Sistemul de leveling BlackOut")
     embed.timestamp = datetime.now(timezone.utc)
 
     await interaction.response.send_message(embed=embed)
