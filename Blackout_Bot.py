@@ -1380,15 +1380,7 @@ async def profile(interaction: discord.Interaction,
 
     # 🔥 Emoji vizual rebirth
     rebirth_display = f"🔥 x{rebirth}" if rebirth > 0 else "—"
-
-    sorted_users = sorted(
-        data_file.items(),
-        key=lambda x: (x[1].get("rebirth", 0), x[1].get("xp", 0)),
-        reverse=True
-    )
-
-    position = next((i for i, (uid, _) in enumerate(sorted_users, start=1) if str(uid) == str(user.id)), None)
-    total_users = len(sorted_users)
+    
 
     embed = discord.Embed(
         title=f"🧑‍🚀 Profilul lui {user.display_name}",
@@ -1414,12 +1406,6 @@ async def profile(interaction: discord.Interaction,
         name="📈 Progres",
         value=f"{progress_bar} `{progress_percent}%`",
         inline=True
-    )
-
-    embed.add_field(
-        name="📈 Poziție în clasament",
-        value=f"`#{position}` din `{total_users}` utilizatori",
-        inline=False
     )
 
     embed.set_footer(text="⚡ Sistemul de leveling BlackOut")
