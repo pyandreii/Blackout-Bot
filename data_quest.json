@@ -1,5 +1,29 @@
 {
     "711202139434647642": {
+        "quest": "Stai 15 minute \u00een voice chat",
+        "type": "voice_minutes",
+        "target": 15,
+        "reward": 120,
+        "progress": 15,
+        "completed": true
+    },
+    "1094241583932657666": {
+        "quest": "R\u0103spunde la o \u00eentrebare \u00een chat",
+        "type": "reply",
+        "target": 1,
+        "reward": 100,
+        "progress": 1,
+        "completed": true
+    },
+    "1206611697616551936": {
+        "quest": "Trimite 10 mesaje \u00eentr-un canal text",
+        "type": "messages",
+        "target": 10,
+        "reward": 80,
+        "progress": 2,
+        "completed": false
+    },
+    "1171568170604179507": {
         "quest": "Reac\u021bioneaz\u0103 la 5 mesaje ale altor membri",
         "type": "reactions",
         "target": 5,
@@ -7,12 +31,20 @@
         "progress": 5,
         "completed": true
     },
-    "1094241583932657666": {
+    "1271457315526021141": {
         "quest": "Stai 15 minute \u00een voice chat",
         "type": "voice_minutes",
         "target": 15,
         "reward": 120,
         "progress": 15,
+        "completed": true
+    },
+    "1074388016182870117": {
+        "quest": "D\u0103 tag unui prieten \u00eentr-un mesaj pe server",
+        "type": "mention_friend",
+        "target": 1,
+        "reward": 90,
+        "progress": 1,
         "completed": true
     }
 }
