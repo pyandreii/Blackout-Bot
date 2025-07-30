@@ -20,7 +20,7 @@ REQUIRED_ROLE_ID = 1397521192092700702
 BUMP_CHANNEL_ID = 1390006025532211310
 DISBOARD_ID = 302050872383242240
 WELCOME_CHANNEL_ID = 1389567710693953606
-GOODBYE_CHANNEL_ID = 123456789012345678
+GOODBYE_CHANNEL_ID = 1389614232948965447
 
 role_nivele = {
     1: 1390238119734935673,
@@ -734,8 +734,17 @@ async def on_message(message):
 
     # === BUMP ===
     if message.channel.id == BUMP_CHANNEL_ID and message.content.lower().startswith("!d bump"):
+        user_id = str(message.author.id)
+        quest = quest_data.get(user_id)
+
         if quest and quest.get("type") == "bump_server" and not quest.get("completed", False):
-            quest["progress"] += 1
+            quest["progress"] = quest.get("progress", 0) + 1
+
+            if quest["progress"] >= quest.get("target", 1):
+                await finalize_quest(message.author, quest)
+
+            quest_data[user_id] = quest
+            save_quest_data()
 
     # === Finalizare quest dacă e complet ===
     if quest and quest["progress"] >= quest.get("target", 0) and not quest.get("completed", False):
@@ -1380,7 +1389,7 @@ async def profile(interaction: discord.Interaction,
 
     # 🔥 Emoji vizual rebirth
     rebirth_display = f"🔥 x{rebirth}" if rebirth > 0 else "—"
-    
+
 
     embed = discord.Embed(
         title=f"🧑‍🚀 Profilul lui {user.display_name}",
