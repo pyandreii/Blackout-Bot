@@ -12,7 +12,7 @@
         "type": "reactions",
         "target": 5,
         "reward": 70,
-        "progress": 0,
+        "progress": 3,
         "completed": false
     },
     "1206611697616551936": {
