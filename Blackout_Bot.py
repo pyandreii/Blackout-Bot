@@ -118,6 +118,16 @@ DAILY_QUESTS = [
         "completed": False
     }
 ]
+color_roles = {
+    "🔴 Roșu": 1400413166919352413,  # <- Pune ID-ul rolului roșu
+    "🟠 Portocaliu": 1400413294149505024,
+    "🟢 Verde": 1400413045670281377,
+    "🌸 Roz": 1400412305161846815,
+    "🟣 Mov": 1400412912690008175,
+    "🔵 Albastru": 1400412390117605376,
+    "⚪ Gri": 1400412596691009637,
+    "🟡 Galben": 1400412453208064060,
+}
 
 data_file = "data_nou.json"
 quest_data_file = "data_quest.json"
@@ -848,6 +858,36 @@ async def blackout_rank(interaction: discord.Interaction,
         f"{member.mention} este nivel {level} cu {xp} XP.\n"
         f"✨ Mai ai nevoie de {xp_ramas} XP până la nivelul {level + 1}.")
 
+class ColorRoleView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        for emoji_label, role_id in color_roles.items():
+            button = discord.ui.Button(label=emoji_label, style=discord.ButtonStyle.secondary, custom_id=str(role_id))
+            button.callback = self.color_button_callback
+            self.add_item(button)
+
+    async def color_button_callback(self, interaction: discord.Interaction):
+        role_id = int(interaction.data['custom_id'])
+        role = interaction.guild.get_role(role_id)
+
+        if not role:
+            await interaction.response.send_message("❌ Rolul nu a fost găsit.", ephemeral=True)
+            return
+
+        if role in interaction.user.roles:
+            await interaction.user.remove_roles(role)
+            await interaction.response.send_message(f"🗑️ Ți-am scos rolul {role.name}.", ephemeral=True)
+        else:
+            # Eliminăm alte culori existente
+            user_roles = [interaction.guild.get_role(rid) for rid in color_roles.values()]
+            roles_to_remove = [r for r in user_roles if r in interaction.user.roles]
+
+            if roles_to_remove:
+                await interaction.user.remove_roles(*roles_to_remove)
+
+            await interaction.user.add_roles(role)
+            await interaction.response.send_message(f"🎨 Ți-am dat rolul {role.name}.", ephemeral=True)
+
 class RebirthConfirmView(discord.ui.View):
     def __init__(self, user_id):
         super().__init__(timeout=60)  # timeout 60 sec
@@ -1337,6 +1377,23 @@ async def showmonthly(interaction: Interaction):
             )
     else:
         await interaction.response.send_message(f"```json\n{data_str}\n```", ephemeral=True)
+
+@blackout.command(name="colors", description="(OWNER) Trimite mesajul de alegere culori")
+@app_commands.describe(channel="Canalul în care să trimiți mesajul")
+async def colors(interaction: discord.Interaction, channel: discord.TextChannel):
+    if interaction.user.id != OWNER_ID:
+        await interaction.response.send_message("⛔ Nu ai permisiunea să folosești această comandă.", ephemeral=True)
+        return
+
+    embed = discord.Embed(
+        title="🎨 Alege-ți culoarea preferată!",
+        description="Apasă pe unul dintre butoanele de mai jos pentru a-ți seta culoarea pe server.\n"
+                    "Dacă apesi din nou pe aceeași culoare, rolul ți se va scoate.",
+        color=discord.Color.blurple()
+    )
+
+    await channel.send(embed=embed, view=ColorRoleView())
+    await interaction.response.send_message(f"✅ Mesajul a fost trimis în {channel.mention}", ephemeral=True)
 
 # Then register this group in your bot setup code:
 @blackout.command(
