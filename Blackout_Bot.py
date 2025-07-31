@@ -21,6 +21,7 @@ BUMP_CHANNEL_ID = 1390006025532211310
 DISBOARD_ID = 302050872383242240
 WELCOME_CHANNEL_ID = 1389567710693953606
 GOODBYE_CHANNEL_ID = 1389614232948965447
+ANIME_ROLE_ID = 1400429087989825669
 
 role_nivele = {
     1: 1390238119734935673,
@@ -859,6 +860,25 @@ async def blackout_rank(interaction: discord.Interaction,
         f"{member.mention} este nivel {level} cu {xp} XP.\n"
         f"✨ Mai ai nevoie de {xp_ramas} XP până la nivelul {level + 1}.")
 
+class AnimeRoleView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="🎌 Sunt fan Anime", style=discord.ButtonStyle.primary, custom_id="anime_fan_role")
+    async def anime_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        role = interaction.guild.get_role(ANIME_ROLE_ID)
+
+        if not role:
+            await interaction.response.send_message("❌ Rolul Anime Fan nu a fost găsit.", ephemeral=True)
+            return
+
+        if role in interaction.user.roles:
+            await interaction.user.remove_roles(role)
+            await interaction.response.send_message(f"🗑️ Ți-am scos rolul {role.name}.", ephemeral=True)
+        else:
+            await interaction.user.add_roles(role)
+            await interaction.response.send_message(f"🎌 Ți-am dat rolul {role.name}.", ephemeral=True)
+
 class ColorRoleView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -1426,6 +1446,22 @@ async def show_quest_data(interaction: Interaction):
             )
     else:
         await interaction.response.send_message(f"```json\n{data_str}\n```", ephemeral=True)
+        
+@blackout.command(name="anime", description="(OWNER) Trimite mesajul pentru rolul Anime Fan")
+@app_commands.describe(channel="Canalul în care să trimiți mesajul")
+async def anime(interaction: discord.Interaction, channel: discord.TextChannel):
+    if interaction.user.id != OWNER_ID:
+        await interaction.response.send_message("⛔ Nu ai permisiunea să folosești această comandă.", ephemeral=True)
+        return
+
+    embed = discord.Embed(
+        title="🎌 Ești fan Anime?",
+        description="Dacă ești pasionat de anime și vrei să primești notificări sau să discuți cu alți otaku, apasă butonul de mai jos!",
+        color=discord.Color.magenta()
+    )
+
+    await channel.send(embed=embed, view=AnimeRoleView())
+    await interaction.response.send_message(f"✅ Mesajul a fost trimis în {channel.mention}", ephemeral=True)
 
 @blackout.command(name="profile", description="Vezi profilul tău Blackout")
 @app_commands.describe(user="Utilizatorul căruia vrei să-i vezi profilul")
