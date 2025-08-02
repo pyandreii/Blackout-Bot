@@ -1110,9 +1110,7 @@ async def daily(interaction: discord.Interaction):
 
         last_claim_str = user_data[user_id].get("last_daily", "2000-01-01")
         last_claim = datetime.strptime(last_claim_str, "%Y-%m-%d").date()
-
-        # ✅ Dă quest nou doar dacă a trecut ziua
-        if today > last_claim:
+        if today > last_claim or user_id not in quest_data:
             quest = generate_daily_quest()
             user_data[user_id]["last_daily"] = str(today)
 
