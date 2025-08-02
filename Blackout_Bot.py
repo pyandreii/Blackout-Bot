@@ -1207,7 +1207,7 @@ async def rules(interaction: discord.Interaction):
          "🔹 **Regula 10**\nNu cere premii sau role dacă nu ai câștigat la giveaway-uri.\n\n"
          "🔹 **Regula 11**\nÎncălcarea regulilor poate duce la mute, kick sau ban, în funcție de gravitate.\n\n"
          "🔹 **Regula 12**\nReclamațiile se fac în ticket, cu dovezi clare (poze/video).\n\n"
-         "🔹 **Regula 13**\nRegulile nu se aplică în VC privat, dar fără conținut adult și cu bun simț.\n\n"
+         "🔹 **Regula 13**\nRegulile nu se aplică în VC privat.\n\n"
          "🔹 **Regula 14**\nEste interzis să ceri sau să oferi informații personale (nume, adresă, cont bancar etc.).\n\n"
          "🔹 **Regula 15**\nDacă ai probleme cu staff-ul, contactează fondatorii cu dovezi clare.\n\n"
          "🔹 **Regula 16**\nEste interzisă folosirea conturilor secundare pentru spam sau evitarea pedepselor.\n\n"
