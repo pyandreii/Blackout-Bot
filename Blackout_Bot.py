@@ -745,18 +745,21 @@ async def on_message(message):
                 quest["progress"] += 1
 
     # === BUMP ===
-    if message.channel.id == BUMP_CHANNEL_ID and message.content.lower().startswith("!d bump"):
-        user_id = str(message.author.id)
-        quest = quest_data.get(user_id)
+    if message.channel.id == BUMP_CHANNEL_ID and message.author.id == DISBOARD_ID:
+        if "bump done" in message.content.lower() or "server bumped" in message.content.lower():
+            if message.mentions:
+                bumper = message.mentions[0]
+                user_id = str(bumper.id)
+                quest = quest_data.get(user_id)
 
-        if quest and quest.get("type") == "bump_server" and not quest.get("completed", False):
-            quest["progress"] = quest.get("progress", 0) + 1
+                if quest and quest.get("type") == "bump_server" and not quest.get("completed", False):
+                    quest["progress"] = quest.get("progress", 0) + 1
 
-            if quest["progress"] >= quest.get("target", 1):
-                await finalize_quest(message.author, quest)
+                    if quest["progress"] >= quest.get("target", 1):
+                        await finalize_quest(bumper, quest)
 
-            quest_data[user_id] = quest
-            save_quest_data()
+                    quest_data[user_id] = quest
+                    save_quest_data()
 
     # === Finalizare quest dacă e complet ===
     if quest and quest["progress"] >= quest.get("target", 0) and not quest.get("completed", False):
@@ -1446,7 +1449,7 @@ async def show_quest_data(interaction: Interaction):
             )
     else:
         await interaction.response.send_message(f"```json\n{data_str}\n```", ephemeral=True)
-        
+
 @blackout.command(name="anime", description="(OWNER) Trimite mesajul pentru rolul Anime Fan")
 @app_commands.describe(channel="Canalul în care să trimiți mesajul")
 async def anime(interaction: discord.Interaction, channel: discord.TextChannel):
