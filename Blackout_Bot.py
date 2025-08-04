@@ -900,7 +900,8 @@ class RebirthConfirmView(discord.ui.View):
             return
 
         # Resetează nivelul, XP și crește rebirth
-        data = user_data.get(self.user_id)
+        user_id_str = str(self.user_id)
+        data = user_data.get(user_id_str)
         if not data:
             await interaction.response.send_message("Nu am găsit datele tale.", ephemeral=True)
             self.value = False
@@ -914,9 +915,9 @@ class RebirthConfirmView(discord.ui.View):
             self.stop()
             return
 
-        data["level"] = 0
-        data["xp"] = 0
-        data["rebirth"] = data.get("rebirth", 0) + 1
+        user_data[user_id_str]["level"] = 0
+        user_data[user_id_str]["xp"] = 0
+        user_data[user_id_str]["rebirth"] = user_data[user_id_str].get("rebirth", 0) + 1
         save_user_data()  # 🔥 Salvează progresul în fișierul JSON
 
         member = interaction.guild.get_member(self.user_id)
