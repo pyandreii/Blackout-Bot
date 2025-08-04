@@ -767,48 +767,18 @@ async def level_up_check(message, user_id):
         user_data[user_id]["level"] = level
         user_data[user_id]["xp"] = xp
 
-        # Reset rebirth dacă nivelul atinge 30
-        if level >= 30:
-            # Rebirth Trigger
-            user_data[user_id]["level"] = 0
-            user_data[user_id]["xp"] = 0
-            user_data[user_id]["rebirth"] = rebirth + 1
-            await update_rebirth_role(message.author, user_data[user_id]["rebirth"])
-
+        role_id = role_nivele.get(level)
+        role = message.guild.get_role(role_id) if role_id else None
+        if role and role not in message.author.roles:
+            await message.author.add_roles(role)
             if channel:
                 await channel.send(
-                    f"🔁 {message.author.mention} a făcut **Rebirth {user_data[user_id]['rebirth']}** și nivelul a fost resetat!")
-            save_user_data()
-            return
-
-            role_id = rebirth_roles.get(rebirth)
-            if role_id:
-                rb_role = message.guild.get_role(role_id)
-                if rb_role and rb_role not in message.author.roles:
-                    await message.author.add_roles(rb_role)
-
-            for lvl, rid in rebirth_roles.items():
-                if lvl != rebirth:
-                    old_role = message.guild.get_role(rid)
-                    if old_role and old_role in message.author.roles:
-                        await message.author.remove_roles(old_role)
-
-            next_level_xp = xp_needed(user_data[user_id]["level"] + 1)
-            break
-
-        else:
-            role_id = role_nivele.get(level)
-            role = message.guild.get_role(role_id) if role_id else None
-            if role and role not in message.author.roles:
-                await message.author.add_roles(role)
-                if channel:
-                    await channel.send(
-                        f"{message.author.mention} a ajuns la nivelul {level} și a primit rolul {role.name}! 🎉"
-                    )
-            elif channel and level != 1:
-                await channel.send(
-                    f"{message.author.mention} a ajuns la nivelul {level}! 🎉"
+                    f"{message.author.mention} a ajuns la nivelul {level} și a primit rolul {role.name}! 🎉"
                 )
+        elif channel and level != 1:
+            await channel.send(
+                f"{message.author.mention} a ajuns la nivelul {level}! 🎉"
+            )
 
         next_level_xp = xp_needed(level + 1)
 
@@ -818,6 +788,14 @@ async def level_up_check(message, user_id):
     save_quest_data()
 
     await bot.process_commands(message)
+
+def recalculate_level(user_id):
+    xp = user_data[user_id]["xp"]
+    level = 0
+    while xp >= xp_needed(level + 1):
+        xp -= xp_needed(level + 1)
+        level += 1
+    user_data[user_id]["level"] = level
 
 def add_xp(user_id: str, amount: int, source: str = "text"):
     user_data.setdefault(user_id, {"xp": 0, "level": 0, "rebirth": 0})
@@ -1351,7 +1329,7 @@ async def rebirth(interaction: Interaction):
 
     if not data or data.get("level", 0) < 30:
         await interaction.response.send_message(
-            "Trebuie să ai nivelul 30 pentru a face Rebirth.", ephemeral=True
+            "Trebuie să ai **minim** nivelul 30 pentru a face Rebirth.", ephemeral=True
         )
         return
 
