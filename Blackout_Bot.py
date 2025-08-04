@@ -1325,7 +1325,8 @@ async def showdata(interaction: Interaction):
 )
 async def rebirth(interaction: Interaction):
     user_id = interaction.user.id
-    data = user_data.get(user_id)
+    user_id_str = str(user_id)  # 🔧 Convertim în string
+    data = user_data.get(user_id_str)
 
     if not data or data.get("level", 0) < 30:
         await interaction.response.send_message(
