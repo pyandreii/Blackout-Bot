@@ -769,15 +769,17 @@ async def level_up_check(message, user_id):
 
         # Reset rebirth dacă nivelul atinge 30
         if level >= 30:
+            # Rebirth Trigger
             user_data[user_id]["level"] = 0
             user_data[user_id]["xp"] = 0
             user_data[user_id]["rebirth"] = rebirth + 1
-            rebirth = user_data[user_id]["rebirth"]
+            await update_rebirth_role(message.author, user_data[user_id]["rebirth"])
 
             if channel:
                 await channel.send(
-                    f"🔁 {message.author.mention} a făcut **Rebirth {rebirth}** și nivelul a fost resetat!"
-                )
+                    f"🔁 {message.author.mention} a făcut **Rebirth {user_data[user_id]['rebirth']}** și nivelul a fost resetat!")
+            save_user_data()
+            return
 
             role_id = rebirth_roles.get(rebirth)
             if role_id:
@@ -817,6 +819,25 @@ async def level_up_check(message, user_id):
 
     await bot.process_commands(message)
 
+def add_xp(user_id: str, amount: int, source: str = "text"):
+    user_data.setdefault(user_id, {"xp": 0, "level": 0, "rebirth": 0})
+    rebirth_level = user_data[user_id].get("rebirth", 0)
+
+    # BONUS XP per Rebirth Level (+2 XP per rebirth)
+    bonus = rebirth_level * 2
+    total_amount = amount + bonus
+
+    user_data[user_id]["xp"] += total_amount
+
+    monthly_data.setdefault(user_id, {"xp": 0, "voice_xp": 0})
+
+    if source == "voice":
+        monthly_data[user_id]["voice_xp"] += total_amount
+    else:
+        monthly_data[user_id]["xp"] += total_amount
+
+    save_user_data()
+    save_monthly_data()
 
 @blackout.command(name="rank", description="Vezi nivelul și XP-ul unui membru")
 @app_commands.describe(member="Membrul căruia vrei să-i vezi rankul")
@@ -909,7 +930,8 @@ class RebirthConfirmView(discord.ui.View):
             return
 
         if data.get("level", 0) < 30:
-            await interaction.response.send_message("Trebuie să fii nivel 30 pentru Rebirth.", ephemeral=True)
+            await interaction.response.send_message("Trebuie să ai minim nivelul 30 pentru a face Rebirth.",
+                                                    ephemeral=True)
             self.value = False
             self.stop()
             return
