@@ -17,8 +17,6 @@ ID_SERVER_PRINCIPAL = 1372682829074530335
 text_channel_id = 1389616154259226625
 CO_OWNER_ROLE_ID = 1397521192092700702
 REQUIRED_ROLE_ID = 1397521192092700702
-BUMP_CHANNEL_ID = 1390006025532211310
-DISBOARD_ID = 302050872383242240
 WELCOME_CHANNEL_ID = 1389567710693953606
 GOODBYE_CHANNEL_ID = 1389614232948965447
 ANIME_ROLE_ID = 1400429087989825669
@@ -97,14 +95,6 @@ DAILY_QUESTS = [
     {
         "quest": "Răspunde la o întrebare în chat",
         "type": "reply",
-        "target": 1,
-        "reward": 100,
-        "progress": 0,
-        "completed": False
-    },
-    {
-        "quest": "Dă bump la server",
-        "type": "bump_server",
         "target": 1,
         "reward": 100,
         "progress": 0,
@@ -276,7 +266,7 @@ user_recent_messages = defaultdict(deque)
 
 
 def generate_daily_quest():
-    allowed_types = {"messages", "reactions", "voice_minutes", "mention_friend", "reply", "bump_server", "invite_friend"}
+    allowed_types = {"messages", "reactions", "voice_minutes", "mention_friend", "reply", "invite_friend"}
     filtered = []
 
     for q in DAILY_QUESTS:
@@ -652,6 +642,7 @@ async def on_ready():
     if not give_voice_xp.is_running():
         give_voice_xp.start()
 
+
 @give_voice_xp.before_loop
 async def before_voice_xp():
     await bot.wait_until_ready()
@@ -745,48 +736,6 @@ async def on_message(message):
             if message.reference:
                 quest["progress"] += 1
 
-    if message.channel.id == BUMP_CHANNEL_ID and message.author.id == DISBOARD_ID:
-        content_lower = message.content.lower()
-
-        # Check message content OR embed description
-        embed_description = ""
-        if message.embeds and message.embeds[0].description:
-            embed_description = message.embeds[0].description.lower()
-
-        if ("bump done" in content_lower or "server bumped" in content_lower or
-                "bump done" in embed_description or "server bumped" in embed_description):
-
-            print("Bump confirmation detected!")
-
-            if message.mentions:
-                bumper = message.mentions[0]
-                print(f"Detected bumper: {bumper}")
-            else:
-                print("No mentions found in the bump message.")
-                return  # Exit early if no mention (optional)
-
-            user_id = str(bumper.id)
-            quest = quest_data.get(user_id)
-
-            if quest:
-                print(f"Quest found for user {user_id}: {quest}")
-            else:
-                print(f"No active quest for user {user_id}")
-                return
-
-            if quest.get("type") == "bump_server" and not quest.get("completed", False):
-                quest["progress"] = quest.get("progress", 0) + 1
-                print(f"Quest progress updated: {quest['progress']}/{quest['target']}")
-
-                if quest["progress"] >= quest.get("target", 1):
-                    print("Quest completed!")
-                    await finalize_quest(bumper, quest)
-
-                quest_data[user_id] = quest
-                save_quest_data()
-                print("Quest data saved.")
-            else:
-                print(f"Quest type mismatch or already completed for user {user_id}")
 
     # === Finalizare quest dacă e complet ===
     if quest and quest["progress"] >= quest.get("target", 0) and not quest.get("completed", False):
@@ -983,33 +932,8 @@ class RebirthConfirmView(discord.ui.View):
         self.value = False
         self.stop()
 
-quest_data[711202139434647642] = {
-    "quest": "Test Debug Quest",
-    "type": "debug",
-    "target": 3,
-    "reward": 999,
-    "progress": 0,
-    "completed": False
-}
-@bot.command()
-async def debugquest(ctx):
-    user_id = str(ctx.author.id)
-    quest = quest_data.get(user_id)
 
-    if quest and quest.get("type") == "debug" and not quest.get("completed", False):
-        quest["progress"] = quest.get("progress", 0) + 1
-        await ctx.send(f"Quest progress updated: {quest['progress']}/{quest['target']}")
 
-        if quest["progress"] >= quest.get("target", 1):
-            await ctx.send("Quest completed!")
-            await finalize_quest(ctx.author, quest)
-
-        quest_data[user_id] = quest
-        save_quest_data()
-        print(f"Quest data saved for {ctx.author}: {quest}")
-    else:
-        await ctx.send("No active debug quest found.")
-save_quest_data()
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction,
                                error: app_commands.AppCommandError):
