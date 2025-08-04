@@ -917,6 +917,11 @@ class RebirthConfirmView(discord.ui.View):
         data["level"] = 0
         data["xp"] = 0
         data["rebirth"] = data.get("rebirth", 0) + 1
+        save_user_data()  # 🔥 Salvează progresul în fișierul JSON
+
+        member = interaction.guild.get_member(self.user_id)
+        if member:
+            await update_rebirth_role(member, data["rebirth"])  # 🔄 Actualizează rolurile de Rebirth
 
         await interaction.response.edit_message(content=f"🔁 Felicitări! Ai făcut Rebirth **{data['rebirth']}**. Nivelul tău a fost resetat.", view=None)
         self.value = True
