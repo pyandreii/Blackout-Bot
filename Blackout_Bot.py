@@ -20,6 +20,7 @@ REQUIRED_ROLE_ID = 1397521192092700702
 WELCOME_CHANNEL_ID = 1389567710693953606
 GOODBYE_CHANNEL_ID = 1389614232948965447
 ANIME_ROLE_ID = 1400429087989825669
+MINECRAFT_ROLE_ID = 140123456789012345
 
 role_nivele = {
     1: 1390238119734935673,
@@ -856,6 +857,24 @@ class AnimeRoleView(discord.ui.View):
         else:
             await interaction.user.add_roles(role)
             await interaction.response.send_message(f"🎌 Ți-am dat rolul {role.name}.", ephemeral=True)
+class MinecraftRoleView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="⛏️ Sunt fan Minecraft", style=discord.ButtonStyle.success, custom_id="minecraft_fan_role")
+    async def minecraft_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        role = interaction.guild.get_role(MINECRAFT_ROLE_ID)
+
+        if not role:
+            await interaction.response.send_message("❌ Rolul Minecraft nu a fost găsit.", ephemeral=True)
+            return
+
+        if role in interaction.user.roles:
+            await interaction.user.remove_roles(role)
+            await interaction.response.send_message(f"🗑️ Ți-am scos rolul {role.name}.", ephemeral=True)
+        else:
+            await interaction.user.add_roles(role)
+            await interaction.response.send_message(f"⛏️ Ți-am dat rolul {role.name}.", ephemeral=True)
 
 class ColorRoleView(discord.ui.View):
     def __init__(self):
@@ -918,7 +937,7 @@ class RebirthConfirmView(discord.ui.View):
         user_data[user_id_str]["level"] = 0
         user_data[user_id_str]["xp"] = 0
         user_data[user_id_str]["rebirth"] = user_data[user_id_str].get("rebirth", 0) + 1
-        save_user_data()  # 🔥 Salvează progresul în fișierul JSON
+        save_user_data()
 
         member = interaction.guild.get_member(self.user_id)
         if member:
@@ -1446,6 +1465,22 @@ async def anime(interaction: discord.Interaction, channel: discord.TextChannel):
     )
 
     await channel.send(embed=embed, view=AnimeRoleView())
+    await interaction.response.send_message(f"✅ Mesajul a fost trimis în {channel.mention}", ephemeral=True)
+
+@blackout.command(name="minecraft", description="(OWNER) Trimite mesajul pentru rolul Minecraft Fan")
+@app_commands.describe(channel="Canalul în care să trimiți mesajul")
+async def minecraft(interaction: discord.Interaction, channel: discord.TextChannel):
+    if interaction.user.id != OWNER_ID:
+        await interaction.response.send_message("⛔ Nu ai permisiunea să folosești această comandă.", ephemeral=True)
+        return
+
+    embed = discord.Embed(
+        title="⛏️ Ești fan Minecraft?",
+        description="Dacă vrei să primești notificări și să joci cu alți membri, apasă pe butonul de mai jos!",
+        color=discord.Color.green()
+    )
+
+    await channel.send(embed=embed, view=MinecraftRoleView())
     await interaction.response.send_message(f"✅ Mesajul a fost trimis în {channel.mention}", ephemeral=True)
 
 @blackout.command(name="profile", description="Vezi profilul tău Blackout")
