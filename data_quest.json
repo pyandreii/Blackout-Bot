@@ -76,8 +76,8 @@
         "type": "voice_minutes",
         "target": 15,
         "reward": 120,
-        "progress": 0,
-        "completed": false
+        "progress": 15,
+        "completed": true
     },
     "1405671037869232138": {
         "quest": "D\u0103 tag unui prieten \u00eentr-un mesaj pe server",
