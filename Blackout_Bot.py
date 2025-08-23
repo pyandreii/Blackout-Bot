@@ -11,6 +11,7 @@ import copy
 from PIL import Image, ImageDraw, ImageFont
 import aiohttp
 import io
+from filelock import  asyncio
 # --- Configurare ---
 
 ID_SERVER_PRINCIPAL = 1372682829074530335
@@ -20,7 +21,7 @@ REQUIRED_ROLE_ID = 1397521192092700702
 WELCOME_CHANNEL_ID = 1389567710693953606
 GOODBYE_CHANNEL_ID = 1389614232948965447
 ANIME_ROLE_ID = 1400429087989825669
-MINECRAFT_ROLE_ID = 1407050293899694140
+MINECRAFT_ROLE_ID = 140123456789012345
 
 role_nivele = {
     1: 1390238119734935673,
@@ -710,7 +711,7 @@ async def on_message(message):
             user_recent_messages[user_id].clear()
             warn_msg = await message.channel.send(f"{message.author.mention}, nu spamma, te rog! Vei fi mutat temporar.")
             await message.author.timeout(timedelta(seconds=30), reason="Spam detectat")
-            await warn_msg.delete(delay=5)
+            await warn_msg.delete(delay=10)
         except Exception as e:
             print(f"[Eroare spam] {e}")
         return
@@ -1483,6 +1484,61 @@ async def minecraft(interaction: discord.Interaction, channel: discord.TextChann
     await channel.send(embed=embed, view=MinecraftRoleView())
     await interaction.response.send_message(f"✅ Mesajul a fost trimis în {channel.mention}", ephemeral=True)
 
+@blackout.command(name="coinflip", description="Joacă un joc de Coinflip 🎲")
+@app_commands.describe(choice="Alege: heads (Pile) sau tails (Fata)")
+@app_commands.choices(choice=[
+    app_commands.Choice(name="🪙 Heads (Pile)", value="heads"),
+    app_commands.Choice(name="🪙 Tails (Fata)", value="tails")
+])
+async def coinflip(interaction: discord.Interaction, choice: app_commands.Choice[str]):
+    user_id = str(interaction.user.id)
+
+    # Suspans
+    await interaction.response.send_message("🪙 Arunc moneda...", ephemeral=False)
+    await asyncio.sleep(2)
+
+    # Rezultat
+    result = random.choice(["heads", "tails"])
+    win = (choice.value == result)
+
+    # XP pentru gamble
+    reward = 100  # câștig / pierdere
+    if win:
+        add_xp(user_id, reward, source="minigame")
+    else:
+        user_data.setdefault(user_id, {"xp": 0, "level": 0, "rebirth": 0})
+        user_data[user_id]["xp"] = max(0, user_data[user_id]["xp"] - reward)  # scădem XP dar nu sub 0
+        save_user_data()
+
+    # Emoji + culoare embed
+    result_emoji = "🪙" if result == "heads" else "🎲"
+    color = discord.Color.green() if win else discord.Color.red()
+
+    # Embed final
+    embed = discord.Embed(
+        title="🎰 Coinflip — Rezultatul este...",
+        description=f"{result_emoji} **{result.capitalize()}**!",
+        color=color
+    )
+    embed.set_thumbnail(url=interaction.user.display_avatar.url)
+
+    if win:
+        embed.add_field(
+            name="🎉 Felicitări!",
+            value=f"Ai ales corect și ai primit **+{reward} XP** ✨",
+            inline=False
+        )
+    else:
+        embed.add_field(
+            name="💀 Ghinion!",
+            value=f"Ai ales **{choice.name}**, dar moneda a căzut invers.\n"
+                  f"❌ Ai pierdut **-{reward} XP**...",
+            inline=False
+        )
+
+    embed.set_footer(text="BlackOut RO • Sistem Coinflip Gamble")
+    await interaction.followup.send(embed=embed)
+
 @blackout.command(name="profile", description="Vezi profilul tău Blackout")
 @app_commands.describe(user="Utilizatorul căruia vrei să-i vezi profilul")
 async def profile(interaction: discord.Interaction,
@@ -1545,4 +1601,3 @@ if not TOKEN:
     raise ValueError("❌ TOKEN is missing! Asigură-te că este setat în .env")
 
 bot.run(TOKEN)
-
