@@ -1488,8 +1488,8 @@ async def minecraft(interaction: discord.Interaction, channel: discord.TextChann
 @blackout.command(name="coinflip", description="Joacă un joc de Coinflip 🎲")
 @app_commands.describe(choice="Alege: heads (Pile) sau tails (Fata)")
 @app_commands.choices(choice=[
-    app_commands.Choice(name="🪙 Heads (Pile)", value="heads"),
-    app_commands.Choice(name="🪙 Tails (Fata)", value="tails")
+    app_commands.Choice(name="🪙 Heads (cap)", value="heads"),
+    app_commands.Choice(name="🪙 Tails (pajura)", value="tails")
 ])
 async def coinflip(interaction: discord.Interaction, choice: app_commands.Choice[str]):
     user_id = str(interaction.user.id)
