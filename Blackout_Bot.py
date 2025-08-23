@@ -1540,6 +1540,60 @@ async def coinflip(interaction: discord.Interaction, choice: app_commands.Choice
     embed.set_footer(text="BlackOut RO • Sistem Coinflip Gamble")
     await interaction.followup.send(embed=embed)
 
+@blackout.command(name="rps", description="Joacă Rock-Paper-Scissors ✊ ✋ ✌️")
+@app_commands.describe(choice="Alege: piatră ✊, hârtie ✋ sau foarfecă ✌️")
+@app_commands.choices(choice=[
+    app_commands.Choice(name="✊ Piatra", value="rock"),
+    app_commands.Choice(name="✋ Hârtie", value="paper"),
+    app_commands.Choice(name="✌️ Foarfeca", value="scissors")
+])
+async def rps(interaction: discord.Interaction, choice: app_commands.Choice[str]):
+    user_id = str(interaction.user.id)
+
+    # Alegerea botului
+    bot_choice = random.choice(["rock", "paper", "scissors"])
+    emojis = {"rock": "✊", "paper": "✋", "scissors": "✌️"}
+
+    # Determinăm rezultatul
+    win = (
+        (choice.value == "rock" and bot_choice == "scissors") or
+        (choice.value == "paper" and bot_choice == "rock") or
+        (choice.value == "scissors" and bot_choice == "paper")
+    )
+    draw = (choice.value == bot_choice)
+
+    reward = 100
+    result_text = ""
+    color = discord.Color.red()
+
+    if win:
+        add_xp(user_id, reward, source="minigame")
+        result_text = f"🎉 Ai câștigat! **+{reward} XP** ✨"
+        color = discord.Color.green()
+    elif draw:
+        result_text = "🤝 Egalitate! Nu ai pierdut și nu ai câștigat XP."
+        color = discord.Color.blurple()
+    else:
+        # Scădem XP, dar nu sub 0
+        user_data.setdefault(user_id, {"xp": 0, "level": 0, "rebirth": 0})
+        user_data[user_id]["xp"] = max(0, user_data[user_id]["xp"] - reward)
+        save_user_data()
+        result_text = f"💀 Ai pierdut! **-{reward} XP**"
+        color = discord.Color.red()
+
+    # Embed final
+    embed = discord.Embed(
+        title="✊ ✋ ✌️ Rock-Paper-Scissors",
+        description=f"Tu ai ales: {emojis[choice.value]}\n"
+                    f"Botul a ales: {emojis[bot_choice]}\n\n"
+                    f"{result_text}",
+        color=color
+    )
+    embed.set_thumbnail(url=interaction.user.display_avatar.url)
+    embed.set_footer(text="BlackOut RO • RPS Gamble")
+
+    await interaction.response.send_message(embed=embed)
+
 @blackout.command(name="profile", description="Vezi profilul tău Blackout")
 @app_commands.describe(user="Utilizatorul căruia vrei să-i vezi profilul")
 async def profile(interaction: discord.Interaction,
