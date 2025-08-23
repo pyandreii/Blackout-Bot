@@ -39,8 +39,8 @@ monthly_roles = {
 rebirth_roles = {
     1: 1395364152419029005,
     2: 1395364253627846806,
-    3: "Rebirth 3",
-    4: "Rebirth 4",
+    3: 1408856739872379052,
+    4: 1408856781450514603,
     5: "Rebirth 5",
     # ... poți continua cât ai nevoie
 }
@@ -1550,11 +1550,9 @@ async def coinflip(interaction: discord.Interaction, choice: app_commands.Choice
 async def rps(interaction: discord.Interaction, choice: app_commands.Choice[str]):
     user_id = str(interaction.user.id)
 
-    # Alegerea botului
     bot_choice = random.choice(["rock", "paper", "scissors"])
     emojis = {"rock": "✊", "paper": "✋", "scissors": "✌️"}
 
-    # Determinăm rezultatul
     win = (
         (choice.value == "rock" and bot_choice == "scissors") or
         (choice.value == "paper" and bot_choice == "rock") or
