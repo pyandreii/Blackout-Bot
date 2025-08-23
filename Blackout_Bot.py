@@ -11,7 +11,8 @@ import copy
 from PIL import Image, ImageDraw, ImageFont
 import aiohttp
 import io
-from filelock import  asyncio
+import asyncio
+from filelock import FileLock
 # --- Configurare ---
 
 ID_SERVER_PRINCIPAL = 1372682829074530335
