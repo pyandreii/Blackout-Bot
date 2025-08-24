@@ -1485,6 +1485,65 @@ async def minecraft(interaction: discord.Interaction, channel: discord.TextChann
     await channel.send(embed=embed, view=MinecraftRoleView())
     await interaction.response.send_message(f"✅ Mesajul a fost trimis în {channel.mention}", ephemeral=True)
 
+@blackout.command(name="dailyspin", description="🎡 Încearcă-ți norocul la Roata Norocului (o dată pe zi)")
+async def daily_spin(interaction: discord.Interaction):
+    user_id = str(interaction.user.id)
+    today = datetime.utcnow().date()
+
+    user_data.setdefault(user_id, {"xp": 0, "level": 0, "rebirth": 0, "last_spin": "2000-01-01"})
+    last_spin_str = user_data[user_id].get("last_spin", "2000-01-01")
+    last_spin = datetime.strptime(last_spin_str, "%Y-%m-%d").date()
+
+    if last_spin == today:
+        await interaction.response.send_message("⏳ Ai folosit deja Daily Spin azi! Revino mâine 🎡", ephemeral=True)
+        return
+
+    rewards = [
+        ("✨ +50 XP", 50),
+        ("✨ +100 XP", 100),
+        ("✨ +200 XP", 200),
+        ("🍀 Jackpot! +500 XP", 500),
+        ("💀 Ghinion! 0 XP", 0),
+        ("😢 Pierzi -50 XP", -50),
+    ]
+
+    # pick final result
+    reward_text, reward_value = random.choice(rewards)
+
+    # first send a "spinning" embed
+    embed = discord.Embed(title="🎡 Daily Spin", description="Se învârte roata... 🔄", color=discord.Color.orange())
+    msg = await interaction.response.send_message(embed=embed)
+    followup_msg = await interaction.original_response()
+
+    # simulate spin (cycle through rewards)
+    for i in range(12):  # number of cycles
+        current_text, _ = random.choice(rewards)
+        embed.description = f"🎰 {current_text}"
+        await followup_msg.edit(embed=embed)
+        await asyncio.sleep(0.4 + (i * 0.05))  # slows down at the end
+
+    # apply reward
+    if reward_value > 0:
+        add_xp(user_id, reward_value, source="dailyspin")
+    elif reward_value < 0:
+        user_data[user_id]["xp"] = max(0, user_data[user_id]["xp"] + reward_value)
+        save_user_data()
+
+    user_data[user_id]["last_spin"] = str(today)
+    save_user_data()
+
+    # final embed
+    final_embed = discord.Embed(
+        title="🎉 Daily Spin Rezultat!",
+        description=f"🧑‍🚀 {interaction.user.mention} a primit:\n**{reward_text}**",
+        color=discord.Color.gold()
+    )
+    final_embed.set_thumbnail(url=interaction.user.display_avatar.url)
+    final_embed.set_footer(text="Revino mâine pentru un nou spin 🔁")
+    final_embed.timestamp = datetime.now(timezone.utc)
+
+    await followup_msg.edit(embed=final_embed)
+
 @blackout.command(name="coinflip", description="Joacă un joc de Coinflip 🎲")
 @app_commands.describe(choice="Alege: heads (Pile) sau tails (Fata)")
 @app_commands.choices(choice=[
