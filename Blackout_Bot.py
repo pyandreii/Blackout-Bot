@@ -23,6 +23,8 @@ WELCOME_CHANNEL_ID = 1389567710693953606
 GOODBYE_CHANNEL_ID = 1389614232948965447
 ANIME_ROLE_ID = 1400429087989825669
 MINECRAFT_ROLE_ID = 140123456789012345
+NEWS_BOT_ROLE_ID = 1409193585299165244
+SERVER_NEWS_ROLE_ID = 1409193648150679633
 
 role_nivele = {
     1: 1390238119734935673,
@@ -859,6 +861,38 @@ class AnimeRoleView(discord.ui.View):
         else:
             await interaction.user.add_roles(role)
             await interaction.response.send_message(f"🎌 Ți-am dat rolul {role.name}.", ephemeral=True)
+
+class NewsRoleView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="📰 News Bot", style=discord.ButtonStyle.primary, custom_id="news_bot_role")
+    async def news_bot_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        role = interaction.guild.get_role(NEWS_BOT_ROLE_ID)
+        if not role:
+            await interaction.response.send_message("❌ Rolul News Bot nu există.", ephemeral=True)
+            return
+        if role in interaction.user.roles:
+            await interaction.user.remove_roles(role)
+            await interaction.response.send_message("🗑️ Ți-am scos rolul **News Bot**.", ephemeral=True)
+        else:
+            await interaction.user.add_roles(role)
+            await interaction.response.send_message("📰 Ți-am dat rolul **News Bot**.", ephemeral=True)
+
+            @discord.ui.button(label="📢 Noutăți Server", style=discord.ButtonStyle.success,
+                               custom_id="server_news_role")
+            async def server_news_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+                role = interaction.guild.get_role(SERVER_NEWS_ROLE_ID)
+                if not role:
+                    await interaction.response.send_message("❌ Rolul Noutăți Server nu există.", ephemeral=True)
+                    return
+                if role in interaction.user.roles:
+                    await interaction.user.remove_roles(role)
+                    await interaction.response.send_message("🗑️ Ți-am scos rolul **Noutăți Server**.", ephemeral=True)
+                else:
+                    await interaction.user.add_roles(role)
+                    await interaction.response.send_message("📢 Ți-am dat rolul **Noutăți Server**.", ephemeral=True)
+
 class MinecraftRoleView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
