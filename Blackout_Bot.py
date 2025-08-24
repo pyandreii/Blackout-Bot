@@ -1632,6 +1632,16 @@ async def coinflip(interaction: discord.Interaction, choice: app_commands.Choice
 
     embed.set_footer(text="BlackOut RO • Sistem Coinflip Gamble")
     await interaction.followup.send(embed=embed)
+    
+@blackout.command(name="roles_news", description="(OWNER) Trimite mesajul cu butoane pentru roluri News/Noutăți")
+@app_commands.describe(channel="Canalul unde să trimiți mesajul")
+async def roles_news(interaction: discord.Interaction, channel: discord.TextChannel):
+    if interaction.user.id != OWNER_ID:
+        await interaction.response.send_message("⛔ Nu ai permisiunea.", ephemeral=True)
+        return
+
+    await channel.send("📢 Alege-ți notificările preferate:", view=NewsRoleView())
+    await interaction.response.send_message(f"✅ Mesaj trimis în {channel.mention}", ephemeral=True)
 
 @blackout.command(name="rps", description="Joacă Rock-Paper-Scissors ✊ ✋ ✌️")
 @app_commands.describe(choice="Alege: piatră ✊, hârtie ✋ sau foarfecă ✌️")
