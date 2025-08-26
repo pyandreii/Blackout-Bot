@@ -1659,9 +1659,8 @@ async def marry(interaction: discord.Interaction, user: discord.Member):
         await interaction.response.send_message("❌ Nu te poți căsători cu tine însuți 😂", ephemeral=True)
         return
 
-    # initialize data
-    user_data.setdefault(author_id, {"xp": 0, "level": 0, "rebirth": 0})
-    user_data.setdefault(target_id, {"xp": 0, "level": 0, "rebirth": 0})
+    user_data.setdefault(author_id, {"xp": 0, "level": 0, "rebirth": 0, "married_to": None, "bestfriend": None})
+    user_data.setdefault(target_id, {"xp": 0, "level": 0, "rebirth": 0, "married_to": None, "bestfriend": None})
 
     if user_data[author_id].get("married_to"):
         await interaction.response.send_message("💔 Ești deja căsătorit! Folosește `/blackout divorce` mai întâi.", ephemeral=True)
@@ -1670,13 +1669,21 @@ async def marry(interaction: discord.Interaction, user: discord.Member):
         await interaction.response.send_message(f"❌ {user.display_name} este deja căsătorit cu altcineva.", ephemeral=True)
         return
 
-    # Save bond
+    # Salvăm căsătoria
     user_data[author_id]["married_to"] = target_id
     user_data[target_id]["married_to"] = author_id
     save_user_data()
 
-    await interaction.response.send_message(f"💍 Felicitări! {interaction.user.mention} s-a căsătorit cu {user.mention} ❤️")
+    embed = discord.Embed(
+        title="💍 Casatorie pe BlackOut RO!",
+        description=f"{interaction.user.mention} ❤️ {user.mention}\n\n"
+                    f"🎉 Felicitări! Sunteți acum un cuplu oficial pe server!",
+        color=discord.Color.pink()
+    )
+    embed.set_thumbnail(url=user.display_avatar.url)
+    embed.set_footer(text="Dragostea plutește în aer ✨")
 
+    await interaction.response.send_message(embed=embed)
 
 @blackout.command(name="divorce", description="Încheie căsătoria 💔")
 async def divorce(interaction: discord.Interaction):
@@ -1706,15 +1713,23 @@ async def bestfriend(interaction: discord.Interaction, user: discord.Member):
         await interaction.response.send_message("❌ Nu poți fi bestfriend cu tine însuți 😂", ephemeral=True)
         return
 
-    user_data.setdefault(author_id, {"xp": 0, "level": 0, "rebirth": 0})
-    user_data.setdefault(target_id, {"xp": 0, "level": 0, "rebirth": 0})
+    user_data.setdefault(author_id, {"xp": 0, "level": 0, "rebirth": 0, "married_to": None, "bestfriend": None})
+    user_data.setdefault(target_id, {"xp": 0, "level": 0, "rebirth": 0, "married_to": None, "bestfriend": None})
 
     user_data[author_id]["bestfriend"] = target_id
     user_data[target_id]["bestfriend"] = author_id
     save_user_data()
 
-    await interaction.response.send_message(f"👯 {interaction.user.mention} și {user.mention} sunt acum cei mai buni prieteni!")
+    embed = discord.Embed(
+        title="👯 Bestfriend nou pe BlackOut RO!",
+        description=f"{interaction.user.mention} 🤝 {user.mention}\n\n"
+                    f"🎉 Sunteți acum cei mai buni prieteni!",
+        color=discord.Color.green()
+    )
+    embed.set_thumbnail(url=user.display_avatar.url)
+    embed.set_footer(text="Prietenia adevărată durează o viață ✨")
 
+    await interaction.response.send_message(embed=embed)
 
 @blackout.command(name="unfriend", description="Rupe prietenia 👋")
 async def unfriend(interaction: discord.Interaction):
@@ -1784,71 +1799,72 @@ async def rps(interaction: discord.Interaction, choice: app_commands.Choice[str]
 
     await interaction.response.send_message(embed=embed)
 
-@blackout.command(name="profile", description="Vezi profilul tău Blackout")
-@app_commands.describe(user="Utilizatorul căruia vrei să-i vezi profilul")
-async def profile(interaction: discord.Interaction,
-                  user: discord.Member = None):
-    user = user or interaction.user
-    user_id = str(user.id)
-    data = user_data.get(user_id, {"xp": 0, "level": 0, "rebirth": 0})
+@blackout.command(name="profile", description="Vezi profilul unui utilizator 📜")
+@app_commands.describe(member="Membrul al cărui profil vrei să-l vezi")
+async def profile(interaction: discord.Interaction, member: discord.Member = None):
+    member = member or interaction.user
+    user_id = str(member.id)
 
-    level = data["level"]
-    xp = data["xp"]
+    # Inițializare dacă nu există
+    user_data.setdefault(user_id, {
+        "xp": 0,
+        "level": 0,
+        "rebirth": 0,
+        "married_to": None,
+        "bestfriend": None
+    })
+    data = user_data[user_id]
+
+    level = data.get("level", 0)
+    xp = data.get("xp", 0)
     rebirth = data.get("rebirth", 0)
-    next_level_xp = xp_needed(level + 1)
 
-    # 🔄 Calcul progres pentru bară XP
-    progress_percent = round((xp / next_level_xp) * 100)
-    filled_blocks = progress_percent // 10
-    progress_bar = f"[{'█' * filled_blocks}{'—' * (10 - filled_blocks)}]"
+    # XP necesar pentru următorul nivel (poți ajusta formula ta)
+    xp_needed = (level + 1) * 200  
 
-    # 🔥 Emoji vizual rebirth
-    rebirth_display = f"🔥 x{rebirth}" if rebirth > 0 else "—"
+    # Progress bar vizual
+    bar_length = 20
+    filled_length = int(bar_length * xp / xp_needed) if xp_needed > 0 else 0
+    xp_bar = "▓" * filled_length + "░" * (bar_length - filled_length)
 
-
+    # Embed profil
     embed = discord.Embed(
-        title=f"🧑‍🚀 Profilul lui {user.display_name}",
-        description=f"🆔 `{user.id}`",
-        color=discord.Color.from_str("#9c88ff")  # violet deschis
+        title=f"📜 Profil — {member.display_name}",
+        color=discord.Color.blurple()
     )
+    embed.set_thumbnail(url=member.display_avatar.url)
 
-    embed.set_thumbnail(url=user.display_avatar.url)
+    # Statistici principale
+    embed.add_field(name="🏆 Level", value=str(level), inline=True)
+    embed.add_field(name="✨ XP", value=f"{xp}/{xp_needed}", inline=True)
+    embed.add_field(name="🔁 Rebirth", value=str(rebirth), inline=True)
 
-    embed.add_field(
-        name="🏅 Nivel & XP",
-        value=f"**{level}**  •  `{xp} / {next_level_xp}` XP",
-        inline=False
-    )
+    # Bara de XP
+    embed.add_field(name="📊 Progress", value=f"`{xp_bar}`", inline=False)
 
-    embed.add_field(
-        name="🔁 Rebirth",
-        value=f"`{rebirth}` {rebirth_display}",
-        inline=True
-    )
+    # ❤️ Marriage
+    partner_id = data.get("married_to")
+    if partner_id:
+        partner = interaction.guild.get_member(int(partner_id))
+        if partner:
+            embed.add_field(name="❤️ Căsătorit cu", value=partner.mention, inline=False)
+        else:
+            embed.add_field(name="❤️ Căsătorit cu", value=f"User ID {partner_id}", inline=False)
 
-    embed.add_field(
-        name="📈 Progres",
-        value=f"{progress_bar} `{progress_percent}%`",
-        inline=True
-    )
+    # 👯 Bestfriend
+    bf_id = data.get("bestfriend")
+    if bf_id:
+        bf = interaction.guild.get_member(int(bf_id))
+        if bf:
+            embed.add_field(name="👯 Bestfriend", value=bf.mention, inline=False)
+        else:
+            embed.add_field(name="👯 Bestfriend", value=f"User ID {bf_id}", inline=False)
 
-    embed.set_footer(text="⚡ Sistemul de leveling BlackOut")
+    # Footer
+    embed.set_footer(text="BlackOut RO • Sistem Profile")
     embed.timestamp = datetime.now(timezone.utc)
 
     await interaction.response.send_message(embed=embed)
-
-    partner_id = data.get("married_to")
-    bf_id = data.get("bestfriend")
-
-    if partner_id:
-        partner = interaction.guild.get_member(int(partner_id))
-        embed.add_field(name="❤️ Căsătorit cu", value=partner.mention if partner else f"User ID {partner_id}",
-                        inline=False)
-
-    if bf_id:
-        bf = interaction.guild.get_member(int(bf_id))
-        embed.add_field(name="👯 Bestfriend", value=bf.mention if bf else f"User ID {bf_id}", inline=False)
-
 
 # --- Pornire bot ---
 # --- ENV PENTRU TOKEN ---
