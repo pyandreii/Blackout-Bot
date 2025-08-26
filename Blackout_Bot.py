@@ -1648,6 +1648,11 @@ async def roles_news(interaction: discord.Interaction, channel: discord.TextChan
     await channel.send("📢 Alege-ți notificările preferate:", view=NewsRoleView())
     await interaction.response.send_message(f"✅ Mesaj trimis în {channel.mention}", ephemeral=True)
 
+ROLE_ID_TAKEN = 1409858012935356546  # pune aici ID-ul rolului "Taken"
+
+# ===========================
+# 💍 MARRY
+# ===========================
 @blackout.command(name="marry", description="Căsătorește-te cu un membru 💍")
 @app_commands.describe(user="Membrul cu care vrei să te căsătorești")
 async def marry(interaction: discord.Interaction, user: discord.Member):
@@ -1673,6 +1678,12 @@ async def marry(interaction: discord.Interaction, user: discord.Member):
     user_data[target_id]["married_to"] = author_id
     save_user_data()
 
+    # Dăm rol "Taken" ambilor
+    taken_role = interaction.guild.get_role(ROLE_ID_TAKEN)
+    if taken_role:
+        await interaction.user.add_roles(taken_role)
+        await user.add_roles(taken_role)
+
     embed = discord.Embed(
         title="💍 Casatorie pe BlackOut RO!",
         description=f"{interaction.user.mention} ❤️ {user.mention}\n\n"
@@ -1684,6 +1695,10 @@ async def marry(interaction: discord.Interaction, user: discord.Member):
 
     await interaction.response.send_message(embed=embed)
 
+
+# ===========================
+# 💔 DIVORCE
+# ===========================
 @blackout.command(name="divorce", description="Încheie căsătoria 💔")
 async def divorce(interaction: discord.Interaction):
     author_id = str(interaction.user.id)
@@ -1693,15 +1708,26 @@ async def divorce(interaction: discord.Interaction):
         await interaction.response.send_message("❌ Nu ești căsătorit cu nimeni.", ephemeral=True)
         return
 
-    # break bond
+    # Rupe legătura
     user_data[author_id]["married_to"] = None
     if partner_id in user_data:
         user_data[partner_id]["married_to"] = None
     save_user_data()
 
+    # Scoatem rol "Taken"
+    taken_role = interaction.guild.get_role(ROLE_ID_TAKEN)
+    if taken_role:
+        await interaction.user.remove_roles(taken_role)
+        partner = interaction.guild.get_member(int(partner_id))
+        if partner:
+            await partner.remove_roles(taken_role)
+
     await interaction.response.send_message("💔 Căsătoria ta a fost desfăcută.")
 
 
+# ===========================
+# 👯 BESTFRIEND
+# ===========================
 @blackout.command(name="bestfriend", description="Fă-ți un bestfriend 👯")
 @app_commands.describe(user="Membrul pe care vrei să-l faci bestfriend")
 async def bestfriend(interaction: discord.Interaction, user: discord.Member):
@@ -1719,6 +1745,12 @@ async def bestfriend(interaction: discord.Interaction, user: discord.Member):
     user_data[target_id]["bestfriend"] = author_id
     save_user_data()
 
+    # Dăm rol "Taken" ambilor
+    taken_role = interaction.guild.get_role(ROLE_ID_TAKEN)
+    if taken_role:
+        await interaction.user.add_roles(taken_role)
+        await user.add_roles(taken_role)
+
     embed = discord.Embed(
         title="👯 Bestfriend nou pe BlackOut RO!",
         description=f"{interaction.user.mention} 🤝 {user.mention}\n\n"
@@ -1730,6 +1762,10 @@ async def bestfriend(interaction: discord.Interaction, user: discord.Member):
 
     await interaction.response.send_message(embed=embed)
 
+
+# ===========================
+# 👋 UNFRIEND
+# ===========================
 @blackout.command(name="unfriend", description="Rupe prietenia 👋")
 async def unfriend(interaction: discord.Interaction):
     author_id = str(interaction.user.id)
@@ -1744,8 +1780,15 @@ async def unfriend(interaction: discord.Interaction):
         user_data[bf_id]["bestfriend"] = None
     save_user_data()
 
-    await interaction.response.send_message("👋 Prietenia a fost ruptă.")
+    # Scoatem rol "Taken" ambilor
+    taken_role = interaction.guild.get_role(ROLE_ID_TAKEN)
+    if taken_role:
+        await interaction.user.remove_roles(taken_role)
+        bf_member = interaction.guild.get_member(int(bf_id))
+        if bf_member:
+            await bf_member.remove_roles(taken_role)
 
+    await interaction.response.send_message("👋 Prietenia a fost ruptă.")
 @blackout.command(name="rps", description="Joacă Rock-Paper-Scissors ✊ ✋ ✌️")
 @app_commands.describe(choice="Alege: piatră ✊, hârtie ✋ sau foarfecă ✌️")
 @app_commands.choices(choice=[
