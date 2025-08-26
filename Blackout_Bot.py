@@ -25,6 +25,8 @@ ANIME_ROLE_ID = 1400429087989825669
 MINECRAFT_ROLE_ID = 140123456789012345
 NEWS_BOT_ROLE_ID = 1409193585299165244
 SERVER_NEWS_ROLE_ID = 1409193648150679633
+ROLE_ID_GIRL = 1389735228851093624
+ROLE_ID_BOY = 1389735069681193030
 
 role_nivele = {
     1: 1390238119734935673,
@@ -1816,13 +1818,17 @@ async def profile(interaction: discord.Interaction, member: discord.Member = Non
     xp = data.get("xp", 0)
     rebirth = data.get("rebirth", 0)
 
-    # XP necesar pentru următorul nivel (poți ajusta formula ta)
+    # XP necesar pentru următorul nivel (poți schimba formula ta)
     xp_needed = (level + 1) * 200
 
     # Progress bar vizual
     bar_length = 20
     filled_length = int(bar_length * xp / xp_needed) if xp_needed > 0 else 0
     xp_bar = "▓" * filled_length + "░" * (bar_length - filled_length)
+
+    # Detectăm genul după roluri
+    is_girl = any(role.id == ROLE_ID_GIRL for role in member.roles)
+    is_boy = any(role.id == ROLE_ID_BOY for role in member.roles)
 
     # Embed profil
     embed = discord.Embed(
@@ -1844,18 +1850,24 @@ async def profile(interaction: discord.Interaction, member: discord.Member = Non
     if partner_id:
         partner = interaction.guild.get_member(int(partner_id))
         if partner:
-            embed.add_field(name="❤️ Căsătorit cu", value=partner.mention, inline=False)
+            if is_girl:
+                embed.add_field(name="💍 Căsătorită cu", value=partner.mention, inline=False)
+            else:
+                embed.add_field(name="💍 Căsătorit cu", value=partner.mention, inline=False)
         else:
-            embed.add_field(name="❤️ Căsătorit cu", value=f"User ID {partner_id}", inline=False)
+            embed.add_field(name="💍 Căsătorit(ă) cu", value=f"User ID {partner_id}", inline=False)
 
     # 👯 Bestfriend
     bf_id = data.get("bestfriend")
     if bf_id:
         bf = interaction.guild.get_member(int(bf_id))
         if bf:
-            embed.add_field(name="👯 Bestfriend", value=bf.mention, inline=False)
+            if is_girl:
+                embed.add_field(name="👯 Prietena cu", value=bf.mention, inline=False)
+            else:
+                embed.add_field(name="👯 Prieten cu", value=bf.mention, inline=False)
         else:
-            embed.add_field(name="👯 Bestfriend", value=f"User ID {bf_id}", inline=False)
+            embed.add_field(name="👯 Prieten(ă) cu", value=f"User ID {bf_id}", inline=False)
 
     # Footer
     embed.set_footer(text="BlackOut RO • Sistem Profile")
