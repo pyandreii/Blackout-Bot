@@ -188,18 +188,35 @@ def add_xp(user_id: str, amount: int, source: str = "text"):
         "married_to": None,
         "bestfriend": None
     })
-    user_data[user_id]["xp"] += amount
 
+    rebirth_level = user_data[user_id].get("rebirth", 0)
+
+    # BONUS XP per Rebirth Level (+2 XP per rebirth)
+    rebirth_bonus = rebirth_level * 2
+    total_amount = amount + rebirth_bonus
+
+    # Adaugăm XP normal
+    user_data[user_id]["xp"] += total_amount
+
+    # BONUS de la căsătorie / prietenie
+    partner_id = user_data[user_id].get("married_to")
+    bf_id = user_data[user_id].get("bestfriend")
+
+    if partner_id and partner_id in user_data:
+        user_data[partner_id]["xp"] += 2  # partenerul primește +2 XP
+
+    if bf_id and bf_id in user_data:
+        user_data[bf_id]["xp"] += 1  # bestfriend primește +1 XP
+
+    # Salvăm în monthly_data
     monthly_data.setdefault(user_id, {"xp": 0, "voice_xp": 0})
-
     if source == "voice":
-        monthly_data[user_id]["voice_xp"] += amount
+        monthly_data[user_id]["voice_xp"] += total_amount
     else:
-        monthly_data[user_id]["xp"] += amount
+        monthly_data[user_id]["xp"] += total_amount
 
     save_user_data()
     save_monthly_data()
-
 def get_total_monthly_xp(user_id: str) -> int:
     data = monthly_data.get(user_id, {})
     return data.get("xp", 0) + data.get("voice_xp", 0)
@@ -807,26 +824,6 @@ def recalculate_level(user_id):
         xp -= xp_needed(level + 1)
         level += 1
     user_data[user_id]["level"] = level
-
-def add_xp(user_id: str, amount: int, source: str = "text"):
-    user_data.setdefault(user_id, {"xp": 0, "level": 0, "rebirth": 0})
-    rebirth_level = user_data[user_id].get("rebirth", 0)
-
-    # BONUS XP per Rebirth Level (+2 XP per rebirth)
-    bonus = rebirth_level * 2
-    total_amount = amount + bonus
-
-    user_data[user_id]["xp"] += total_amount
-
-    monthly_data.setdefault(user_id, {"xp": 0, "voice_xp": 0})
-
-    if source == "voice":
-        monthly_data[user_id]["voice_xp"] += total_amount
-    else:
-        monthly_data[user_id]["xp"] += total_amount
-
-    save_user_data()
-    save_monthly_data()
 
 @blackout.command(name="rank", description="Vezi nivelul și XP-ul unui membru")
 @app_commands.describe(member="Membrul căruia vrei să-i vezi rankul")
@@ -1820,7 +1817,7 @@ async def profile(interaction: discord.Interaction, member: discord.Member = Non
     rebirth = data.get("rebirth", 0)
 
     # XP necesar pentru următorul nivel (poți ajusta formula ta)
-    xp_needed = (level + 1) * 200  
+    xp_needed = (level + 1) * 200
 
     # Progress bar vizual
     bar_length = 20
