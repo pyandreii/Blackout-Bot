@@ -181,7 +181,13 @@ def assign_daily_quest(user_id: str):
 
 
 def add_xp(user_id: str, amount: int, source: str = "text"):
-    user_data.setdefault(user_id, {"xp": 0, "level": 0, "rebirth": 0})
+    user_data.setdefault(user_id, {
+        "xp": 0,
+        "level": 0,
+        "rebirth": 0,
+        "married_to": None,
+        "bestfriend": None
+    })
     user_data[user_id]["xp"] += amount
 
     monthly_data.setdefault(user_id, {"xp": 0, "voice_xp": 0})
@@ -1632,7 +1638,7 @@ async def coinflip(interaction: discord.Interaction, choice: app_commands.Choice
 
     embed.set_footer(text="BlackOut RO • Sistem Coinflip Gamble")
     await interaction.followup.send(embed=embed)
-    
+
 @blackout.command(name="roles_news", description="(OWNER) Trimite mesajul cu butoane pentru roluri News/Noutăți")
 @app_commands.describe(channel="Canalul unde să trimiți mesajul")
 async def roles_news(interaction: discord.Interaction, channel: discord.TextChannel):
@@ -1642,6 +1648,89 @@ async def roles_news(interaction: discord.Interaction, channel: discord.TextChan
 
     await channel.send("📢 Alege-ți notificările preferate:", view=NewsRoleView())
     await interaction.response.send_message(f"✅ Mesaj trimis în {channel.mention}", ephemeral=True)
+
+@blackout.command(name="marry", description="Căsătorește-te cu un membru 💍")
+@app_commands.describe(user="Membrul cu care vrei să te căsătorești")
+async def marry(interaction: discord.Interaction, user: discord.Member):
+    author_id = str(interaction.user.id)
+    target_id = str(user.id)
+
+    if author_id == target_id:
+        await interaction.response.send_message("❌ Nu te poți căsători cu tine însuți 😂", ephemeral=True)
+        return
+
+    # initialize data
+    user_data.setdefault(author_id, {"xp": 0, "level": 0, "rebirth": 0})
+    user_data.setdefault(target_id, {"xp": 0, "level": 0, "rebirth": 0})
+
+    if user_data[author_id].get("married_to"):
+        await interaction.response.send_message("💔 Ești deja căsătorit! Folosește `/blackout divorce` mai întâi.", ephemeral=True)
+        return
+    if user_data[target_id].get("married_to"):
+        await interaction.response.send_message(f"❌ {user.display_name} este deja căsătorit cu altcineva.", ephemeral=True)
+        return
+
+    # Save bond
+    user_data[author_id]["married_to"] = target_id
+    user_data[target_id]["married_to"] = author_id
+    save_user_data()
+
+    await interaction.response.send_message(f"💍 Felicitări! {interaction.user.mention} s-a căsătorit cu {user.mention} ❤️")
+
+
+@blackout.command(name="divorce", description="Încheie căsătoria 💔")
+async def divorce(interaction: discord.Interaction):
+    author_id = str(interaction.user.id)
+    partner_id = user_data.get(author_id, {}).get("married_to")
+
+    if not partner_id:
+        await interaction.response.send_message("❌ Nu ești căsătorit cu nimeni.", ephemeral=True)
+        return
+
+    # break bond
+    user_data[author_id]["married_to"] = None
+    if partner_id in user_data:
+        user_data[partner_id]["married_to"] = None
+    save_user_data()
+
+    await interaction.response.send_message("💔 Căsătoria ta a fost desfăcută.")
+
+
+@blackout.command(name="bestfriend", description="Fă-ți un bestfriend 👯")
+@app_commands.describe(user="Membrul pe care vrei să-l faci bestfriend")
+async def bestfriend(interaction: discord.Interaction, user: discord.Member):
+    author_id = str(interaction.user.id)
+    target_id = str(user.id)
+
+    if author_id == target_id:
+        await interaction.response.send_message("❌ Nu poți fi bestfriend cu tine însuți 😂", ephemeral=True)
+        return
+
+    user_data.setdefault(author_id, {"xp": 0, "level": 0, "rebirth": 0})
+    user_data.setdefault(target_id, {"xp": 0, "level": 0, "rebirth": 0})
+
+    user_data[author_id]["bestfriend"] = target_id
+    user_data[target_id]["bestfriend"] = author_id
+    save_user_data()
+
+    await interaction.response.send_message(f"👯 {interaction.user.mention} și {user.mention} sunt acum cei mai buni prieteni!")
+
+
+@blackout.command(name="unfriend", description="Rupe prietenia 👋")
+async def unfriend(interaction: discord.Interaction):
+    author_id = str(interaction.user.id)
+    bf_id = user_data.get(author_id, {}).get("bestfriend")
+
+    if not bf_id:
+        await interaction.response.send_message("❌ Nu ai niciun bestfriend setat.", ephemeral=True)
+        return
+
+    user_data[author_id]["bestfriend"] = None
+    if bf_id in user_data:
+        user_data[bf_id]["bestfriend"] = None
+    save_user_data()
+
+    await interaction.response.send_message("👋 Prietenia a fost ruptă.")
 
 @blackout.command(name="rps", description="Joacă Rock-Paper-Scissors ✊ ✋ ✌️")
 @app_commands.describe(choice="Alege: piatră ✊, hârtie ✋ sau foarfecă ✌️")
@@ -1747,6 +1836,18 @@ async def profile(interaction: discord.Interaction,
     embed.timestamp = datetime.now(timezone.utc)
 
     await interaction.response.send_message(embed=embed)
+
+    partner_id = data.get("married_to")
+    bf_id = data.get("bestfriend")
+
+    if partner_id:
+        partner = interaction.guild.get_member(int(partner_id))
+        embed.add_field(name="❤️ Căsătorit cu", value=partner.mention if partner else f"User ID {partner_id}",
+                        inline=False)
+
+    if bf_id:
+        bf = interaction.guild.get_member(int(bf_id))
+        embed.add_field(name="👯 Bestfriend", value=bf.mention if bf else f"User ID {bf_id}", inline=False)
 
 
 # --- Pornire bot ---
