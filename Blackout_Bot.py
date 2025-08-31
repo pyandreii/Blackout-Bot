@@ -49,6 +49,13 @@ rebirth_roles = {
     # ... poți continua cât ai nevoie
 }
 
+SHOP_ITEMS = {
+    "🎖️ VIP Role": {"price": 5, "role_id": 1411683045005725716},   # pune ID-ul rolului
+    "🌈 Custom Color": {"price": 10, "role_id": 1411683083618615386},
+    "🔥 Special Tag": {"price": 20, "role_id": 1411683193106464829},
+}
+
+
 # --- DAILY QUESTS ---
 DAILY_QUESTS = [
     {
@@ -188,7 +195,8 @@ def add_xp(user_id: str, amount: int, source: str = "text"):
         "level": 0,
         "rebirth": 0,
         "married_to": None,
-        "bestfriend": None
+        "bestfriend": None,
+        "coins": 0  # <- nou
     })
 
     rebirth_level = user_data[user_id].get("rebirth", 0)
@@ -222,6 +230,21 @@ def add_xp(user_id: str, amount: int, source: str = "text"):
 def get_total_monthly_xp(user_id: str) -> int:
     data = monthly_data.get(user_id, {})
     return data.get("xp", 0) + data.get("voice_xp", 0)
+
+def add_coins(user_id: str, amount: int):
+    user_data.setdefault(user_id, {"coins": 0})
+    user_data[user_id]["coins"] = user_data[user_id].get("coins", 0) + amount
+    save_user_data()
+
+def remove_coins(user_id: str, amount: int) -> bool:
+    if user_data.get(user_id, {}).get("coins", 0) >= amount:
+        user_data[user_id]["coins"] -= amount
+        save_user_data()
+        return True
+    return False
+
+def get_coins(user_id: str) -> int:
+    return user_data.get(user_id, {}).get("coins", 0)
 
 def has_required_role():
 
@@ -446,6 +469,7 @@ async def give_voice_xp():
 
                     if quest["progress"] >= quest.get("target", 0):
                         await finalize_quest(member, quest)
+                        add_coins(str(member.id), 1)
 
                     quest_data[user_id] = quest
                     save_needed = True
@@ -946,6 +970,43 @@ class ColorRoleView(discord.ui.View):
 
             await interaction.user.add_roles(role)
             await interaction.response.send_message(f"🎨 Ți-am dat rolul {role.name}.", ephemeral=True)
+
+class ShopView(discord.ui.View):
+    def __init__(self, user: discord.Member):
+        super().__init__(timeout=60)
+        self.user = user
+        for item_name, data in SHOP_ITEMS.items():
+            self.add_item(ShopButton(item_name, data["price"], data["role_id"], user))
+
+class ShopButton(discord.ui.Button):
+    def __init__(self, name, price, role_id, user):
+        super().__init__(label=f"{name} — {price}💰", style=discord.ButtonStyle.primary)
+        self.item_name = name
+        self.price = price
+        self.role_id = role_id
+        self.user = user
+
+    async def callback(self, interaction: discord.Interaction):
+        user_id = str(interaction.user.id)
+
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("❌ Acest meniu nu este pentru tine.", ephemeral=True)
+            return
+
+        if get_coins(user_id) < self.price:
+            await interaction.response.send_message("💸 Nu ai suficienți bani.", ephemeral=True)
+            return
+
+        if remove_coins(user_id, self.price):
+            role = interaction.guild.get_role(self.role_id)
+            if role:
+                await interaction.user.add_roles(role)
+                await interaction.response.send_message(
+                    f"✅ Ai cumpărat **{self.item_name}** pentru {self.price}💰!",
+                    ephemeral=True
+                )
+            else:
+                await interaction.response.send_message("❌ Rolul nu există pe acest server.", ephemeral=True)
 
 class RebirthConfirmView(discord.ui.View):
     def __init__(self, user_id):
@@ -1789,6 +1850,13 @@ async def unfriend(interaction: discord.Interaction):
             await bf_member.remove_roles(taken_role)
 
     await interaction.response.send_message("👋 Prietenia a fost ruptă.")
+
+@blackout.command(name="balance", description="Vezi câți bani ai 💰")
+async def balance(interaction: discord.Interaction, member: discord.Member = None):
+    member = member or interaction.user
+    coins = get_coins(str(member.id))
+    await interaction.response.send_message(f"{member.mention} are **{coins}💰**.", ephemeral=False)
+
 @blackout.command(name="rps", description="Joacă Rock-Paper-Scissors ✊ ✋ ✌️")
 @app_commands.describe(choice="Alege: piatră ✊, hârtie ✋ sau foarfecă ✌️")
 @app_commands.choices(choice=[
@@ -1840,6 +1908,21 @@ async def rps(interaction: discord.Interaction, choice: app_commands.Choice[str]
     embed.set_footer(text="BlackOut RO • RPS Gamble")
 
     await interaction.response.send_message(embed=embed)
+
+@blackout.command(name="shop", description="🛒 Deschide shop-ul serverului")
+async def shop(interaction: discord.Interaction):
+    coins = get_coins(str(interaction.user.id))
+
+    embed = discord.Embed(
+        title="🛒 Shop BlackOut",
+        description=f"Ai în total: **{coins}💰**\nApasă pe un buton pentru a cumpăra:",
+        color=discord.Color.gold()
+    )
+
+    for item_name, data in SHOP_ITEMS.items():
+        embed.add_field(name=item_name, value=f"💰 {data['price']}", inline=False)
+
+    await interaction.response.send_message(embed=embed, view=ShopView(interaction.user), ephemeral=True)
 
 @blackout.command(name="profile", description="Vezi profilul unui utilizator 📜")
 @app_commands.describe(member="Membrul al cărui profil vrei să-l vezi")
